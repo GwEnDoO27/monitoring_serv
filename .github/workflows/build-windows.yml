@@ -38,7 +38,7 @@ jobs:
           wails build
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@4
         with:
           name: wails-windows-build
           path: build/bin/*.exe
