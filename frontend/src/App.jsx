@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Server, AlertCircle, CheckCircle, Clock, Settings, Trash2, Edit } from 'lucide-react';
-import { GetServers, AddServer, UpdateServer, DeleteServer, SendTestNotification } from '../wailsjs/go/main/App';
+import { AlertCircle, CheckCircle, Clock, Edit, Plus, Server, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AddServer, DeleteServer, GetServers, UpdateServer } from '../wailsjs/go/main/App';
 
 
 const ServerMonitor = () => {
@@ -22,20 +22,20 @@ const ServerMonitor = () => {
     return () => clearInterval(interval);
   }, []);
 
-    const loadServers = async () => {
-        try{
-            const serverList = await GetServers();
-            setServers(serverList);   
-        }catch (error){
-            console.error('Failed to load servers: ', error)
-        }
+  const loadServers = async () => {
+    try {
+      const serverList = await GetServers();
+      setServers(serverList);
+    } catch (error) {
+      console.error('Failed to load servers: ', error)
     }
+  }
 
   const handleAddServer = async () => {
     if (!newServer.name || !newServer.url) return;
     try {
       await AddServer(newServer);
-      setNewServer({name: '', url: '', type: 'http', interval: '30s', timeout: '10s'});
+      setNewServer({ name: '', url: '', type: 'http', interval: '30s', timeout: '10s' });
       setShowAddForm(false);
       loadServers();
     } catch (error) {
@@ -69,9 +69,9 @@ const ServerMonitor = () => {
   const handleUpdateServer = async (e) => {
     e.preventDefault();
     try {
-      await UpdateServer({...newServer, id: editingServer.id});
+      await UpdateServer({ ...newServer, id: editingServer.id });
       setEditingServer(null);
-      setNewServer({name: '', url: '', type: 'http', interval: '30s', timeout: '10s'});
+      setNewServer({ name: '', url: '', type: 'http', interval: '30s', timeout: '10s' });
       setShowAddForm(false);
       loadServers();
     } catch (error) {
@@ -89,6 +89,13 @@ const ServerMonitor = () => {
 
   const upServers = servers.filter(s => s.status?.is_up).length;
   const totalServers = servers.length;
+
+  function testNotification() {
+    window.go.notifications.NotificationManager.Send("Test", "Notification de test")
+      .then(() => console.log("Test envoyé"))
+      .catch(err => console.error("Erreur:", err));
+  }
+
 
   return (
     <div className="min-h-screen bg-slate-800 p-6 text-white font-nunito">
@@ -111,11 +118,11 @@ const ServerMonitor = () => {
               Ajouter un serveur
             </button>
             <button
-                onClick={() => window.App.SendTestNotification("Hello", "Ceci est une notification test")}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow lg"
+              onClick={testNotification}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow lg"
             >
-            <Plus className="w-4 h-4" />
-                Tester
+              <Plus className="w-4 h-4" />
+              Tester
             </button>
           </div>
         </div>
@@ -202,7 +209,7 @@ const ServerMonitor = () => {
               <h2 className="text-xl font-bold mb-4 text-white">
                 {editingServer ? 'Modifier le serveur' : 'Ajouter un serveur'}
               </h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Nom</label>
@@ -210,7 +217,7 @@ const ServerMonitor = () => {
                     type="text"
                     required
                     value={newServer.name}
-                    onChange={(e) => setNewServer({...newServer, name: e.target.value})}
+                    onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
                     placeholder="Mon serveur"
                   />
@@ -222,7 +229,7 @@ const ServerMonitor = () => {
                     type="text"
                     required
                     value={newServer.url}
-                    onChange={(e) => setNewServer({...newServer, url: e.target.value})}
+                    onChange={(e) => setNewServer({ ...newServer, url: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
                     placeholder="https://example.com ou 192.168.1.1:80"
                   />
@@ -233,7 +240,7 @@ const ServerMonitor = () => {
                     <label className="block text-sm font-medium text-slate-300 mb-1">Type</label>
                     <select
                       value={newServer.type}
-                      onChange={(e) => setNewServer({...newServer, type: e.target.value})}
+                      onChange={(e) => setNewServer({ ...newServer, type: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     >
                       <option value="http">HTTP</option>
@@ -246,7 +253,7 @@ const ServerMonitor = () => {
                     <label className="block text-sm font-medium text-slate-300 mb-1">Intervalle</label>
                     <select
                       value={newServer.interval}
-                      onChange={(e) => setNewServer({...newServer, interval: e.target.value})}
+                      onChange={(e) => setNewServer({ ...newServer, interval: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     >
                       <option value="15s">15 secondes</option>
@@ -261,7 +268,7 @@ const ServerMonitor = () => {
                   <label className="block text-sm font-medium text-slate-300 mb-1">Timeout</label>
                   <select
                     value={newServer.timeout}
-                    onChange={(e) => setNewServer({...newServer, timeout: e.target.value})}
+                    onChange={(e) => setNewServer({ ...newServer, timeout: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                   >
                     <option value="3s">3 secondes</option>
@@ -277,7 +284,7 @@ const ServerMonitor = () => {
                     onClick={() => {
                       setShowAddForm(false);
                       setEditingServer(null);
-                      setNewServer({name: '', url: '', type: 'http', interval: '30s', timeout: '10s'});
+                      setNewServer({ name: '', url: '', type: 'http', interval: '30s', timeout: '10s' });
                     }}
                     className="flex-1 px-4 py-2 text-slate-300 bg-slate-600 rounded-md hover:bg-slate-500 transition-colors border border-slate-500"
                   >

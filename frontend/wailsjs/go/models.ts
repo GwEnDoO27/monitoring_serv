@@ -3,8 +3,7 @@ export namespace main {
 	export class ServerStatus {
 	    is_up: boolean;
 	    response_time_ms: number;
-	    // Go type: time
-	    last_check: any;
+	    last_check: time.Time;
 	    last_error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -15,7 +14,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.is_up = source["is_up"];
 	        this.response_time_ms = source["response_time_ms"];
-	        this.last_check = this.convertValues(source["last_check"], null);
+	        this.last_check = this.convertValues(source["last_check"], time.Time);
 	        this.last_error = source["last_error"];
 	    }
 	
@@ -78,6 +77,23 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace time {
+	
+	export class Time {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new Time(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
 	}
 
 }

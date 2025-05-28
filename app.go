@@ -188,7 +188,7 @@ func (a *App) validateServer(server *Server) error {
 	return nil
 }
 
-// Méthodes de monitoring
+// Version améliorée de StartMonitoring avec gestion intelligente des notifications
 func (m *Monitor) StartMonitoring(server *Server) {
 	interval, err := parseDuration(server.Interval)
 	if err != nil {
@@ -206,10 +206,12 @@ func (m *Monitor) StartMonitoring(server *Server) {
 	m.mutex.Unlock()
 
 	go func() {
+		// État initial
 		prevStatus := server.Status
 		newStatus := m.checkServer(server, timeout)
 		m.updateServerStatus(server.ID, newStatus)
 
+		// Notification pour le changement d'état initial
 		if prevStatus.IsUp != newStatus.IsUp {
 			statusLabel := "DOWN"
 			if newStatus.IsUp {
@@ -221,25 +223,46 @@ func (m *Monitor) StartMonitoring(server *Server) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
+		consecutiveFailures := 0
+
 		for {
 			select {
 			case <-ticker.C:
-				// Ici on relit l'état actuel du serveur
 				m.mutex.RLock()
-				serverCopy := *m.servers[server.ID] // copy to avoid race
+				serverCopy := *m.servers[server.ID]
 				m.mutex.RUnlock()
 
 				prevStatus := serverCopy.Status
 				newStatus := m.checkServer(&serverCopy, timeout)
-
 				m.updateServerStatus(server.ID, newStatus)
 
+				// Gestion intelligente des notifications
 				if prevStatus.IsUp != newStatus.IsUp {
-					statusLabel := "DOWN"
 					if newStatus.IsUp {
-						statusLabel = "UP"
+						// Serveur de nouveau UP
+						consecutiveFailures = 0
+						m.Notifier.Send(server.Name, "UP")
+					} else {
+						// Serveur DOWN
+						consecutiveFailures++
+
+						// Notification critique après 3 échecs consécutifs
+						if consecutiveFailures >= 3 {
+							m.Notifier.SendCritical(server.Name,
+								fmt.Sprintf("DOWN (échecs: %d)", consecutiveFailures))
+						} else {
+							m.Notifier.Send(server.Name, "DOWN")
+						}
 					}
-					m.Notifier.Send(server.Name, statusLabel)
+				} else if !newStatus.IsUp {
+					// Serveur toujours DOWN, incrémenter le compteur
+					consecutiveFailures++
+
+					// Notification critique périodique pour les pannes persistantes
+					if consecutiveFailures%5 == 0 { // Tous les 5 échecs
+						m.Notifier.SendCritical(server.Name,
+							fmt.Sprintf("TOUJOURS DOWN (échecs: %d)", consecutiveFailures))
+					}
 				}
 
 			case <-stopChan:
@@ -419,6 +442,46 @@ func parseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-func (a *App) SendTestNotification(title, message string) {
+/* func (a *App) SendTestNotification(title, message string) {
 	a.monitor.Notifier.Send(title, message)
+} */
+
+// Ajouts/modifications pour votre fichier main.go
+
+// Nouvelle méthode pour votre struct App
+func (a *App) SetNotificationsEnabled(enabled bool) {
+	a.monitor.Notifier.SetEnabled(enabled)
+}
+
+func (a *App) GetNotificationsEnabled() bool {
+	return a.monitor.Notifier.IsEnabled()
+}
+
+func (a *App) SetNotificationCooldown(minutes int) {
+	a.monitor.Notifier.SetCooldown(minutes)
+}
+
+func (a *App) GetNotificationCooldown() int {
+	return a.monitor.Notifier.GetCooldown()
+}
+
+func (a *App) ClearNotificationCooldowns() {
+	a.monitor.Notifier.ClearCooldowns()
+}
+
+// Méthode pour envoyer un résumé des serveurs en panne
+func (a *App) SendDownServersSummary() {
+	a.monitor.mutex.RLock()
+	defer a.monitor.mutex.RUnlock()
+
+	var downServers []string
+	for _, server := range a.monitor.servers {
+		if !server.Status.IsUp {
+			downServers = append(downServers, server.Name)
+		}
+	}
+
+	if len(downServers) > 0 {
+		a.monitor.Notifier.SendSummary(downServers)
+	}
 }

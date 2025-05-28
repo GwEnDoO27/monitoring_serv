@@ -14,7 +14,7 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	notifier := notifications.NewNotificationManager(15)
+	notifier := notifications.NewNotificationManager(1)
 	app := NewApp(notifier)
 	// Create application with options
 	err := wails.Run(&options.App{

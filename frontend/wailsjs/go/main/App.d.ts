@@ -4,10 +4,20 @@ import {main} from '../models';
 
 export function AddServer(arg1:main.Server):Promise<main.Server>;
 
+export function ClearNotificationCooldowns():Promise<void>;
+
 export function DeleteServer(arg1:string):Promise<void>;
+
+export function GetNotificationCooldown():Promise<number>;
+
+export function GetNotificationsEnabled():Promise<boolean>;
 
 export function GetServers():Promise<Array<main.Server>>;
 
-export function SendTestNotification(arg1:string,arg2:string):Promise<void>;
+export function SendDownServersSummary():Promise<void>;
+
+export function SetNotificationCooldown(arg1:number):Promise<void>;
+
+export function SetNotificationsEnabled(arg1:boolean):Promise<void>;
 
 export function UpdateServer(arg1:main.Server):Promise<main.Server>;

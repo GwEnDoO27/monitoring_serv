@@ -6,16 +6,36 @@ export function AddServer(arg1) {
   return window['go']['main']['App']['AddServer'](arg1);
 }
 
+export function ClearNotificationCooldowns() {
+  return window['go']['main']['App']['ClearNotificationCooldowns']();
+}
+
 export function DeleteServer(arg1) {
   return window['go']['main']['App']['DeleteServer'](arg1);
+}
+
+export function GetNotificationCooldown() {
+  return window['go']['main']['App']['GetNotificationCooldown']();
+}
+
+export function GetNotificationsEnabled() {
+  return window['go']['main']['App']['GetNotificationsEnabled']();
 }
 
 export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
-export function SendTestNotification(arg1, arg2) {
-  return window['go']['main']['App']['SendTestNotification'](arg1, arg2);
+export function SendDownServersSummary() {
+  return window['go']['main']['App']['SendDownServersSummary']();
+}
+
+export function SetNotificationCooldown(arg1) {
+  return window['go']['main']['App']['SetNotificationCooldown'](arg1);
+}
+
+export function SetNotificationsEnabled(arg1) {
+  return window['go']['main']['App']['SetNotificationsEnabled'](arg1);
 }
 
 export function UpdateServer(arg1) {
