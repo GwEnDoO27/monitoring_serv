@@ -14,6 +14,10 @@ export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
+export function SendTestNotification(arg1, arg2) {
+  return window['go']['main']['App']['SendTestNotification'](arg1, arg2);
+}
+
 export function UpdateServer(arg1) {
   return window['go']['main']['App']['UpdateServer'](arg1);
 }

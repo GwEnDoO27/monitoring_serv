@@ -1,19 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Server, AlertCircle, CheckCircle, Clock, Settings, Trash2, Edit } from 'lucide-react';
-import { GetServers, AddServer, UpdateServer, DeleteServer } from '../wailsjs/go/main/App';
-/* const mockWailsContext = {
-  GetServers: () => Promise.resolve([
-    {id: '1', name: 'Site Principal', url: 'https://monsite.com', type: 'http', interval: '30s', timeout: '10s', status: {is_up: true, response_time_ms: 245, last_check: new Date().toISOString()}},
-    {id: '2', name: 'API Backend', url: 'https://api.monsite.com', type: 'http', interval: '60s', timeout: '5s', status: {is_up: false, response_time_ms: 0, last_check: new Date().toISOString(), last_error: 'Connection timeout'}},
-    {id: '3', name: 'Database Server', url: '192.168.1.100:5432', type: 'tcp', interval: '45s', timeout: '3s', status: {is_up: true, response_time_ms: 12, last_check: new Date().toISOString()}}
-  ]),
-  AddServer: (server) => Promise.resolve({...server, id: Date.now().toString()}),
-  DeleteServer: (id) => Promise.resolve(),
-  UpdateServer: (server) => Promise.resolve(server)
-};
- */
-
-
+import { GetServers, AddServer, UpdateServer, DeleteServer, SendTestNotification } from '../wailsjs/go/main/App';
 
 
 const ServerMonitor = () => {
@@ -122,6 +109,13 @@ const ServerMonitor = () => {
             >
               <Plus className="w-4 h-4" />
               Ajouter un serveur
+            </button>
+            <button
+                onClick={() => window.App.SendTestNotification("Hello", "Ceci est une notification test")}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow lg"
+            >
+            <Plus className="w-4 h-4" />
+                Tester
             </button>
           </div>
         </div>

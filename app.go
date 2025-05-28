@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	notifications "monitoring_serv/backend"
 	"net"
 	"net/http"
 	"os"
@@ -22,9 +23,15 @@ type App struct {
 }
 
 // NewApp creates a new App application struct
-func NewApp() *App {
+func NewApp(notifier *notifications.NotificationManager) *App {
 	return &App{
-		monitor: NewMonitor(),
+		monitor: &Monitor{
+			servers:    make(map[string]*Server),
+			stopChans:  make(map[string]chan bool),
+			statusChan: make(chan ServerStatusUpdate, 100),
+			mutex:      sync.RWMutex{},
+			Notifier:   notifier,
+		},
 	}
 }
 
@@ -66,6 +73,7 @@ type Monitor struct {
 	stopChans  map[string]chan bool
 	statusChan chan ServerStatusUpdate
 	mutex      sync.RWMutex
+	Notifier   *notifications.NotificationManager
 }
 
 type ServerStatusUpdate struct {
@@ -182,7 +190,6 @@ func (a *App) validateServer(server *Server) error {
 
 // Méthodes de monitoring
 func (m *Monitor) StartMonitoring(server *Server) {
-	// Parse interval and timeout
 	interval, err := parseDuration(server.Interval)
 	if err != nil {
 		interval = 30 * time.Second
@@ -199,9 +206,17 @@ func (m *Monitor) StartMonitoring(server *Server) {
 	m.mutex.Unlock()
 
 	go func() {
-		// Première vérification immédiate
-		status := m.checkServer(server, timeout)
-		m.updateServerStatus(server.ID, status)
+		prevStatus := server.Status
+		newStatus := m.checkServer(server, timeout)
+		m.updateServerStatus(server.ID, newStatus)
+
+		if prevStatus.IsUp != newStatus.IsUp {
+			statusLabel := "DOWN"
+			if newStatus.IsUp {
+				statusLabel = "UP"
+			}
+			m.Notifier.Send(server.Name, statusLabel)
+		}
 
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -209,8 +224,24 @@ func (m *Monitor) StartMonitoring(server *Server) {
 		for {
 			select {
 			case <-ticker.C:
-				status := m.checkServer(server, timeout)
-				m.updateServerStatus(server.ID, status)
+				// Ici on relit l'état actuel du serveur
+				m.mutex.RLock()
+				serverCopy := *m.servers[server.ID] // copy to avoid race
+				m.mutex.RUnlock()
+
+				prevStatus := serverCopy.Status
+				newStatus := m.checkServer(&serverCopy, timeout)
+
+				m.updateServerStatus(server.ID, newStatus)
+
+				if prevStatus.IsUp != newStatus.IsUp {
+					statusLabel := "DOWN"
+					if newStatus.IsUp {
+						statusLabel = "UP"
+					}
+					m.Notifier.Send(server.Name, statusLabel)
+				}
+
 			case <-stopChan:
 				return
 			}
@@ -386,4 +417,8 @@ func parseDuration(s string) (time.Duration, error) {
 	}
 
 	return time.ParseDuration(s)
+}
+
+func (a *App) SendTestNotification(title, message string) {
+	a.monitor.Notifier.Send(title, message)
 }

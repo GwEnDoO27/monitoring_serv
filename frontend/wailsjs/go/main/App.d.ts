@@ -8,4 +8,6 @@ export function DeleteServer(arg1:string):Promise<void>;
 
 export function GetServers():Promise<Array<main.Server>>;
 
+export function SendTestNotification(arg1:string,arg2:string):Promise<void>;
+
 export function UpdateServer(arg1:main.Server):Promise<main.Server>;

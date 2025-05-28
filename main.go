@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	notifications "monitoring_serv/backend"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -13,8 +14,8 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
-
+	notifier := notifications.NewNotificationManager(15)
+	app := NewApp(notifier)
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:  "monitoring_serv",
@@ -27,6 +28,7 @@ func main() {
 		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,
+			notifier,
 		},
 	})
 
