@@ -10,7 +10,7 @@ const ServerHeader = ({ upServers, totalServers, onAddClick }) => {
 
   return (
     <div className="mb-8">
-      <h1 className="text-3xl font-bold text-white mb-2">Monitoring des Serveurs</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-white">Monitoring des Serveurs</h1>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${upServers === totalServers ? 'bg-emerald-500' : 'bg-red-500'}`}></div>

@@ -14,6 +14,8 @@ export function GetNotificationsEnabled():Promise<boolean>;
 
 export function GetServers():Promise<Array<main.Server>>;
 
+export function GetSystemTheme():Promise<string>;
+
 export function ManualCheck(arg1:main.Server):Promise<main.ServerStatus>;
 
 export function SendDownServersSummary():Promise<void>;

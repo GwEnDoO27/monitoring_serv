@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { AddServer, DeleteServer, GetServers, UpdateServer, ManualCheck } from '../wailsjs/go/main/App';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
+import { useTheme } from './hooks/useTheme';
 
 import ServerCard from './components/ServerCard';
 import ServerForm from './components/ServerForm';
@@ -19,6 +20,8 @@ const ServerMonitor = () => {
     interval: '30s',
     timeout: '10s'
   });
+
+  const { theme, isLoading, isDark } = useTheme();
 
   useEffect(() => {
     loadServers();
@@ -100,10 +103,28 @@ const ServerMonitor = () => {
   const upServers = servers.filter(s => s.status?.is_up).length;
   const totalServers = servers.length;
 
+  // Affichage de chargement pendant la détection du thème
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+        <div className="text-gray-900 dark:text-white">Chargement...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-800 p-6 text-white font-nunito">
+    <div className="min-h-screen p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-nunito transition-colors duration-200">
       <div className="max-w-6xl mx-auto">
-        <Toaster position="top-right" />
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: 'var(--toast-bg)',
+              color: 'var(--toast-color)',
+            },
+            className: 'dark:bg-gray-800 dark:text-white bg-white text-gray-900',
+          }}
+        />
         <ServerHeader
           upServers={upServers}
           totalServers={totalServers}
@@ -138,11 +159,11 @@ const ServerMonitor = () => {
 
         {servers.length === 0 && (
           <div className="text-center py-12">
-            <h3 className="text-lg font-medium text-white mb-2">Aucun serveur configuré</h3>
-            <p className="text-slate-400 mb-4">Commencez par ajouter un serveur à monitorer</p>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucun serveur configuré</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Commencez par ajouter un serveur à monitorer</p>
             <button
               onClick={() => setShowAddForm(true)}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors shadow-lg"
             >
               Ajouter votre premier serveur
             </button>

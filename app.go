@@ -497,3 +497,18 @@ func (a *App) ManualCheck(server Server) ServerStatus {
 
 	return status
 }
+
+func (a *App) GetSystemTheme() string {
+	cmd := exec.Command("defaults", "read", "-g", "AppleInterfaceStyle")
+	output, err := cmd.Output()
+	if err != nil {
+		// If command fails, assume light theme (default)
+		return "light"
+	}
+
+	theme := strings.TrimSpace(string(output))
+	if theme == "Dark" {
+		return "dark"
+	}
+	return "light"
+}
