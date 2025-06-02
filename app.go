@@ -52,7 +52,11 @@ func (a *App) onDomReady(ctx context.Context) {
 }
 
 func (a *App) onShutdown(ctx context.Context) {
-	a.monitor.SaveServersToFile()
+	fmt.Println(">>> onShutdown called, saving servers to file")
+	err := a.monitor.SaveServersToFile()
+	if err != nil {
+		fmt.Println(">>> Error saving servers:", err)
+	}
 }
 
 type Server struct {

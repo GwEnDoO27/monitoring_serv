@@ -1,8 +1,8 @@
 // File: components/ServerMonitor.jsx
+import { Grid3X3, LayoutGrid, List } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { AddServer, DeleteServer, GetServers, UpdateServer, ManualCheck } from '../wailsjs/go/main/App';
-import { Toaster } from 'react-hot-toast';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
+import { AddServer, DeleteServer, GetServers, ManualCheck, UpdateServer } from '../wailsjs/go/main/App';
 import { useTheme } from './hooks/useTheme';
 
 import ServerCard from './components/ServerCard';
@@ -13,6 +13,7 @@ const ServerMonitor = () => {
   const [servers, setServers] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingServer, setEditingServer] = useState(null);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' ou 'list'
   const [newServer, setNewServer] = useState({
     name: '',
     url: '',
@@ -114,8 +115,8 @@ const ServerMonitor = () => {
 
   return (
     <div className="min-h-screen p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-nunito transition-colors duration-200">
-      <div className="max-w-6xl mx-auto">
-        <Toaster 
+      <div className="max-w-7xl mx-auto">
+        <Toaster
           position="top-right"
           toastOptions={{
             style: {
@@ -125,13 +126,45 @@ const ServerMonitor = () => {
             className: 'dark:bg-gray-800 dark:text-white bg-white text-gray-900',
           }}
         />
-        <ServerHeader
-          upServers={upServers}
-          totalServers={totalServers}
-          onAddClick={() => setShowAddForm(true)}
-        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Header avec boutons de basculement de vue */}
+        <div className="flex items-center justify-between mb-6">
+          <ServerHeader
+            upServers={upServers}
+            totalServers={totalServers}
+            onAddClick={() => setShowAddForm(true)}
+          />
+
+          {/* Boutons de basculement de vue */}
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${viewMode === 'grid'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="text-sm font-medium">Grille</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${viewMode === 'list'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+            >
+              <List className="w-4 h-4" />
+              <span className="text-sm font-medium">Liste</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Conteneur des serveurs avec vue conditionnelle */}
+        <div className={`mb-8 ${viewMode === 'grid'
+            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+            : 'space-y-4'
+          }`}>
           {servers.map((server) => (
             <ServerCard
               key={server.id}
@@ -139,10 +172,12 @@ const ServerMonitor = () => {
               onEdit={handleEditServer}
               onDelete={handleDeleteServer}
               onManualCheck={handleManualCheck}
+              isHorizontal={viewMode === 'list'}
             />
           ))}
         </div>
 
+        {/* Panel de formulaire */}
         {showAddForm && (
           <ServerForm
             editingServer={editingServer}
@@ -157,16 +192,26 @@ const ServerMonitor = () => {
           />
         )}
 
+        {/* Message si aucun serveur */}
         {servers.length === 0 && (
           <div className="text-center py-12">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucun serveur configuré</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Commencez par ajouter un serveur à monitorer</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors shadow-lg"
-            >
-              Ajouter votre premier serveur
-            </button>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 max-w-md mx-auto">
+              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Grid3X3 className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Aucun serveur configuré
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Commencez par ajouter un serveur à monitorer pour voir son statut en temps réel
+              </p>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors shadow-lg font-medium"
+              >
+                Ajouter votre premier serveur
+              </button>
+            </div>
           </div>
         )}
       </div>
