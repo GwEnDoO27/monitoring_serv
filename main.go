@@ -31,6 +31,7 @@ func main() {
 			notifier,
 		},
 		OnDomReady: app.onDomReady,
+		OnShutdown: app.onShutdown,
 	})
 
 	if err != nil {

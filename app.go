@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"	
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +49,10 @@ func (a *App) onDomReady(ctx context.Context) {
 	for _, server := range a.monitor.servers {
 		a.monitor.StartMonitoring(server)
 	}
+}
+
+func (a *App) onShutdown(ctx context.Context) {
+	a.monitor.SaveServersToFile()
 }
 
 type Server struct {
