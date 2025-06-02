@@ -1,6 +1,8 @@
 import { AlertCircle, CheckCircle, Clock, Edit, Plus, Server, Trash2, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddServer, DeleteServer, GetServers, UpdateServer, ManualCheck } from '../wailsjs/go/main/App';
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 
 const ServerMonitor = () => {
@@ -79,13 +81,16 @@ const ServerMonitor = () => {
     }
   };
   const handleManualCheck = async (server) =>{
+    const toastId = toast.loading(`Vérification de ${server.name}...`);
     try {
         const upstatus = await ManualCheck(server) ;
         console.log("Statut du serveur mis à jour :", upstatus);
         setServers((prev) => 
             prev.map((s) => (s.id === server.id ? { ...s, status: upstatus}: s))
         )
+        toast.success(`Statut mis à jour pour ${server.name}`, { id: toastId });
     } catch (err){
+        toast.error(`Erreur pour ${server.name}`, { id: toastId });
         console.error("Erreur pendant le test manuel :", err)
     }
   };
@@ -111,6 +116,7 @@ const ServerMonitor = () => {
   return (
     <div className="min-h-screen bg-slate-800 p-6 text-white font-nunito">
       <div className="max-w-6xl mx-auto">
+      <Toaster position='top-right'/>
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Monitoring des Serveurs</h1>
