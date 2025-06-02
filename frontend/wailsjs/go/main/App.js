@@ -26,6 +26,10 @@ export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
+export function ManualCheck(arg1) {
+  return window['go']['main']['App']['ManualCheck'](arg1);
+}
+
 export function SendDownServersSummary() {
   return window['go']['main']['App']['SendDownServersSummary']();
 }

@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
+	"strconv"	
 	"strings"
 	"sync"
 	"time"
@@ -208,7 +208,7 @@ func (m *Monitor) StartMonitoring(server *Server) {
 	go func() {
 		// État initial
 		prevStatus := server.Status
-		newStatus := m.checkServer(server, timeout)
+		newStatus := m.CheckServer(server, timeout)
 		m.updateServerStatus(server.ID, newStatus)
 
 		// Notification pour le changement d'état initial
@@ -233,7 +233,7 @@ func (m *Monitor) StartMonitoring(server *Server) {
 				m.mutex.RUnlock()
 
 				prevStatus := serverCopy.Status
-				newStatus := m.checkServer(&serverCopy, timeout)
+				newStatus := m.CheckServer(&serverCopy, timeout)
 				m.updateServerStatus(server.ID, newStatus)
 
 				// Gestion intelligente des notifications
@@ -280,7 +280,7 @@ func (m *Monitor) updateServerStatus(serverID string, status ServerStatus) {
 	m.mutex.Unlock()
 }
 
-func (m *Monitor) checkServer(server *Server, timeout time.Duration) ServerStatus {
+func (m *Monitor) CheckServer(server *Server, timeout time.Duration) ServerStatus {
 	start := time.Now()
 
 	switch server.Type {
@@ -446,8 +446,6 @@ func parseDuration(s string) (time.Duration, error) {
 	a.monitor.Notifier.Send(title, message)
 } */
 
-// Ajouts/modifications pour votre fichier main.go
-
 // Nouvelle méthode pour votre struct App
 func (a *App) SetNotificationsEnabled(enabled bool) {
 	a.monitor.Notifier.SetEnabled(enabled)
@@ -484,4 +482,14 @@ func (a *App) SendDownServersSummary() {
 	if len(downServers) > 0 {
 		a.monitor.Notifier.SendSummary(downServers)
 	}
+}
+
+func (a *App) ManualCheck(server Server) ServerStatus {
+	timeout, err := parseDuration(server.Timeout)
+	if err != nil {
+		timeout = 10 * time.Second
+	}
+	status := a.monitor.CheckServer(&server, timeout)
+
+	return status
 }

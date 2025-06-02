@@ -1,6 +1,6 @@
-import { AlertCircle, CheckCircle, Clock, Edit, Plus, Server, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Edit, Plus, Server, Trash2, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { AddServer, DeleteServer, GetServers, UpdateServer } from '../wailsjs/go/main/App';
+import { AddServer, DeleteServer, GetServers, UpdateServer, ManualCheck } from '../wailsjs/go/main/App';
 
 
 const ServerMonitor = () => {
@@ -78,6 +78,17 @@ const ServerMonitor = () => {
       console.error('Failed to update server:', error);
     }
   };
+  const handleManualCheck = async (server) =>{
+    try {
+        const upstatus = await ManualCheck(server) ;
+        console.log("Statut du serveur mis à jour :", upstatus);
+        setServers((prev) => 
+            prev.map((s) => (s.id === server.id ? { ...s, status: upstatus}: s))
+        )
+    } catch (err){
+        console.error("Erreur pendant le test manuel :", err)
+    }
+  };
 
   const getStatusColor = (isUp) => isUp ? 'text-emerald-400' : 'text-red-400';
   const getStatusBg = (isUp) => isUp ? 'bg-emerald-500/10' : 'bg-red-500/10';
@@ -152,6 +163,13 @@ const ServerMonitor = () => {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                  <button
+                    onClick={() => handleManualCheck(server)}
+                    className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+
                 </div>
               </div>
 

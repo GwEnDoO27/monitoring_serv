@@ -30,6 +30,7 @@ func main() {
 			app,
 			notifier,
 		},
+		OnDomReady: app.onDomReady,
 	})
 
 	if err != nil {
