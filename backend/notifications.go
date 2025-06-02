@@ -64,15 +64,15 @@ func (n *NotificationManager) Send(serverName, status string) {
 	case "DOWN":
 		title = "🔴 Serveur Hors Ligne"
 		message = fmt.Sprintf("Le serveur '%s' ne répond plus", serverName)
-		iconPath = "" // Vous pouvez ajouter un chemin vers une icône d'erreur
+		iconPath = "../build/Icons-green.icns" // Vous pouvez ajouter un chemin vers une icône d'erreur
 	case "UP":
 		title = "🟢 Serveur En Ligne"
 		message = fmt.Sprintf("Le serveur '%s' est de nouveau accessible", serverName)
-		iconPath = "" // Vous pouvez ajouter un chemin vers une icône de succès
+		iconPath = "../build/Icons-green.icns" // Vous pouvez ajouter un chemin vers une icône de succès
 	default:
 		title = "ℹ️ Statut Serveur"
 		message = fmt.Sprintf("Serveur '%s': %s", serverName, status)
-		iconPath = ""
+		iconPath = "../build/Icons-green.icns"
 	}
 
 	err := beeep.Notify(title, message, iconPath)
@@ -129,7 +129,7 @@ func (n *NotificationManager) SendSummary(downServers []string) {
 			fmt.Sprintf("%s et %d autres", downServers[0], len(downServers)-1))
 	}
 
-	err := beeep.Notify(title, message, "")
+	err := beeep.Notify(title, message, "../build/Icons-green.icns")
 	if err != nil {
 		fmt.Printf("Erreur d'envoi de résumé: %v\n", err)
 	}

@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 
 const ServerHeader = ({ upServers, totalServers, onAddClick }) => {
   const testNotification = () => {
-    window.go.notifications.NotificationManager.Send("Test", "Notification de test")
+    window.go.notifications.NotificationManager.Send("Test", "ℹ️ Statut Serveur")
       .then(() => console.log("Test envoyé"))
       .catch(err => console.error("Erreur:", err));
   };
