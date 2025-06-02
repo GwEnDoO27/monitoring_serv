@@ -19,7 +19,7 @@ body {
 
 /* Mode sombre appliqué via la classe 'dark' sur html */
 .dark body {
-  background-color: #111827;
+  background-color: #2c2c2e;
   color: #ffffff;
 }
 

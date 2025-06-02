@@ -2,7 +2,7 @@
 import { AlertCircle, CheckCircle, Clock, Edit, Trash2, RefreshCw, Server } from 'lucide-react';
 
 const ServerCard = ({ server, onEdit, onDelete, onManualCheck }) => {
-  const getStatusColor = (isUp) => isUp ? 'text-emerald-400' : 'text-red-400';
+  const getStatusColor = (isUp) => isUp ? 'text-green-400' : 'text-red-400';
   const formatTime = (ms) => ms ? `${ms}ms` : 'N/A';
   const formatLastCheck = (timestamp) => {
     const date = new Date(timestamp);
@@ -10,7 +10,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck }) => {
   };
 
   return (
-    <div className={`bg-slate-700 rounded-lg shadow-xl p-6 border-l-4 ${server.status?.is_up ? 'border-emerald-500' : 'border-red-500'} hover:bg-slate-600 transition-colors`}>
+    <div className={`bg-slate-700 rounded-lg shadow-xl p-6 border-l-4 ${server.status?.is_up ? 'border-green-500' : 'border-red-500'} hover:bg-slate-600 transition-colors`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <Server className="w-5 h-5 text-slate-400" />
@@ -37,7 +37,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck }) => {
           <span className="text-sm text-slate-400">Statut</span>
           <div className="flex items-center gap-2">
             {server.status?.is_up ? (
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
+              <CheckCircle className="w-4 h-4 text-green-400" />
             ) : (
               <AlertCircle className="w-4 h-4 text-red-400" />
             )}
