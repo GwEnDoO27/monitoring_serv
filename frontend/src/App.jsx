@@ -2,18 +2,28 @@
 import { Grid3X3, LayoutGrid, List } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { AddServer, DeleteServer, GetServers, ManualCheck, UpdateServer } from '../wailsjs/go/main/App';
+import {
+  AddServer,
+  DeleteServer,
+  GetServers,
+  ManualCheck,
+  UpdateServer,
+  GetSettings,
+  SaveSettings
+} from '../wailsjs/go/main/App';
 import { useTheme } from './hooks/useTheme';
 
 import ServerCard from './components/ServerCard';
 import ServerForm from './components/ServerForm';
 import ServerHeader from './components/ServerHeader';
+import Settings from './components/Settings';
 
 const ServerMonitor = () => {
   const [servers, setServers] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingServer, setEditingServer] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' ou 'list'
+  const [showSettings, setShowSettings] = useState(false);
   const [newServer, setNewServer] = useState({
     name: '',
     url: '',
@@ -22,13 +32,26 @@ const ServerMonitor = () => {
     timeout: '10s'
   });
 
-  const { theme, isLoading, isDark } = useTheme();
+  const { theme, isLoading, isDark, setThemeManually } = useTheme();
 
+  // Ce useEffect ne dépend plus de [theme, isDark], mais seulement du premier montage
   useEffect(() => {
     loadServers();
+
+    // On récupère la préférence “theme” une seule fois au montage
+    GetSettings()
+      .then((s) => {
+        if (['auto', 'light', 'dark'].includes(s.theme)) {
+          setThemeManually(s.theme);
+        }
+      })
+      .catch((err) => {
+        console.error('Impossible de charger les settings Wails :', err);
+      });
+
     const interval = setInterval(loadServers, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); // <-- tableau de dépendances vide
 
   const loadServers = async () => {
     try {
@@ -97,14 +120,28 @@ const ServerMonitor = () => {
       toast.success(`Statut mis à jour pour ${server.name}`, { id: toastId });
     } catch (err) {
       toast.error(`Erreur pour ${server.name}`, { id: toastId });
-      console.error("Erreur pendant le test manuel :", err);
+      console.error('Erreur pendant le test manuel :', err);
     }
   };
+    const handleSettingsClose = () => {
+    setShowSettings(false);
+    GetSettings()
+      .then((s) => {
+        if (['auto', 'light', 'dark'].includes(s.theme)) {
+          setThemeManually(s.theme);
+        }
+      })
+      .catch((err) =>
+        console.error('Impossible de recharger les settings :', err)
+      );
+  };
 
-  const upServers = servers.filter(s => s.status?.is_up).length;
+
+
+  const upServers = servers.filter((s) => s.status?.is_up).length;
   const totalServers = servers.length;
 
-  // Affichage de chargement pendant la détection du thème
+  // Affiche l’écran de chargement tant qu’on détecte le thème
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
@@ -121,9 +158,9 @@ const ServerMonitor = () => {
           toastOptions={{
             style: {
               background: 'var(--toast-bg)',
-              color: 'var(--toast-color)',
+              color: 'var(--toast-color)'
             },
-            className: 'dark:bg-gray-800 dark:text-white bg-white text-gray-900',
+            className: 'dark:bg-gray-800 dark:text-white bg-white text-gray-900'
           }}
         />
 
@@ -133,26 +170,29 @@ const ServerMonitor = () => {
             upServers={upServers}
             totalServers={totalServers}
             onAddClick={() => setShowAddForm(true)}
+            OpenSettings={() => setShowSettings(true)}
           />
 
           {/* Boutons de basculement de vue */}
           <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${viewMode === 'grid'
+              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                viewMode === 'grid'
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
+              }`}
             >
               <LayoutGrid className="w-4 h-4" />
               <span className="text-sm font-medium">Grille</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${viewMode === 'list'
+              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                viewMode === 'list'
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
+              }`}
             >
               <List className="w-4 h-4" />
               <span className="text-sm font-medium">Liste</span>
@@ -161,10 +201,13 @@ const ServerMonitor = () => {
         </div>
 
         {/* Conteneur des serveurs avec vue conditionnelle */}
-        <div className={`mb-8 ${viewMode === 'grid'
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-            : 'space-y-4'
-          }`}>
+        <div
+          className={`mb-8 ${
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+              : 'space-y-4'
+          }`}
+        >
           {servers.map((server) => (
             <ServerCard
               key={server.id}
@@ -186,11 +229,21 @@ const ServerMonitor = () => {
             onClose={() => {
               setShowAddForm(false);
               setEditingServer(null);
-              setNewServer({ name: '', url: '', type: 'http', interval: '30s', timeout: '10s' });
+              setNewServer({
+                name: '',
+                url: '',
+                type: 'http',
+                interval: '30s',
+                timeout: '10s'
+              });
             }}
             onSubmit={editingServer ? handleUpdateServer : handleAddServer}
           />
         )}
+
+        {/* Modal des réglages */}
+        {showSettings && <Settings onClose={handleSettingsClose} />}
+
 
         {/* Message si aucun serveur */}
         {servers.length === 0 && (
@@ -203,7 +256,8 @@ const ServerMonitor = () => {
                 Aucun serveur configuré
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Commencez par ajouter un serveur à monitorer pour voir son statut en temps réel
+                Commencez par ajouter un serveur à monitorer pour voir son statut en
+                temps réel
               </p>
               <button
                 onClick={() => setShowAddForm(true)}

@@ -1,5 +1,4 @@
-// notifications.go
-package notifications
+package backend
 
 import (
 	"fmt"

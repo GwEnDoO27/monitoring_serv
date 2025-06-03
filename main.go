@@ -2,7 +2,8 @@ package main
 
 import (
 	"embed"
-	notifications "monitoring_serv/backend"
+	"fmt"
+	backend "monitoring_serv/backend"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -15,10 +16,28 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	notifier := notifications.NewNotificationManager(1)
+	loadedSettings, err := backend.LoadSettings()
+	if err != nil {
+		fmt.Println("⚠️ Impossible de charger les settings au démarrage :", err)
+		loadedSettings = backend.DefaultSettings()
+	}
+
+	notifier := backend.NewNotificationManager(loadedSettings.NotificationCooldown)
+
+	switch loadedSettings.NotificationMode {
+	case "inapp":
+		notifier.SetEnabled(true)
+	case "email":
+		notifier.SetEnabled(false)
+	case "none":
+		notifier.SetEnabled(false)
+	default:
+		notifier.SetEnabled(true)
+	}
+
 	app := NewApp(notifier)
 	// Create application with options
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:  "monitoring_serv",
 		Width:  1024,
 		Height: 768,

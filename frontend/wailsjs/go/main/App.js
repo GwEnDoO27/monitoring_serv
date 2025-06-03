@@ -26,12 +26,20 @@ export function GetServers() {
   return window['go']['main']['App']['GetServers']();
 }
 
+export function GetSettings() {
+  return window['go']['main']['App']['GetSettings']();
+}
+
 export function GetSystemTheme() {
   return window['go']['main']['App']['GetSystemTheme']();
 }
 
 export function ManualCheck(arg1) {
   return window['go']['main']['App']['ManualCheck'](arg1);
+}
+
+export function SaveSettings(arg1) {
+  return window['go']['main']['App']['SaveSettings'](arg1);
 }
 
 export function SendDownServersSummary() {

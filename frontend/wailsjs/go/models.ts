@@ -1,3 +1,26 @@
+export namespace backend {
+	
+	export class Settings {
+	    theme: string;
+	    notificationMode: string;
+	    notificationCooldown: number;
+	    refreshInterval: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Settings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.theme = source["theme"];
+	        this.notificationMode = source["notificationMode"];
+	        this.notificationCooldown = source["notificationCooldown"];
+	        this.refreshInterval = source["refreshInterval"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class ServerStatus {
