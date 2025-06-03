@@ -12,7 +12,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
   // Mode horizontal (liste)
   if (isHorizontal) {
     return (
-      <div className={`bg-white dark:bg-slate-700 rounded-lg shadow-lg p-4 border-l-4 ${
+      <div className={`bg-white dark:bg-gray-700 rounded-lg shadow-lg p-4 border-l-4 ${
         server.status?.is_up ? 'border-green-500' : 'border-red-500'
       } hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors`}>
         <div className="flex items-center justify-between">
@@ -22,7 +22,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
               <Server className="w-5 h-5 text-gray-500 dark:text-slate-400" />
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white">{server.name}</h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">{server.url}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-200">{server.url}</p>
               </div>
             </div>
           </div>
@@ -42,8 +42,8 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
 
             {/* Temps de réponse */}
             <div className="text-center min-w-[80px]">
-              <span className="text-xs text-gray-500 dark:text-slate-500 block">Réponse</span>
-              <span className="text-sm font-mono text-gray-900 dark:text-slate-300">
+              <span className="text-xs text-gray-500 dark:text-slate-00 block">Réponse</span>
+              <span className="text-sm font-mono text-gray-900 text-gray-200">
                 {formatTime(server.status?.response_time_ms)}
               </span>
             </div>
@@ -51,7 +51,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
             {/* Type et intervalle */}
             <div className="text-center min-w-[100px]">
               <span className="text-xs text-gray-500 dark:text-slate-500 block">Type</span>
-              <span className="text-sm text-gray-900 dark:text-slate-300">
+              <span className="text-sm text-gray-900 text-gray-200">
                 {server.type.toUpperCase()}
               </span>
             </div>
@@ -61,7 +61,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
               <span className="text-xs text-gray-500 dark:text-slate-500 block">Dernière check</span>
               <div className="flex items-center justify-center gap-1">
                 <Clock className="w-3 h-3 text-gray-500 dark:text-slate-500" />
-                <span className="text-sm text-gray-900 dark:text-slate-300">
+                <span className="text-sm text-gray-900 text-gray-200">
                   {server.status?.last_check ? formatLastCheck(server.status.last_check) : 'N/A'}
                 </span>
               </div>
@@ -106,7 +106,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
 
   // Mode vertical (grille) - version originale améliorée
   return (
-    <div className={`bg-white dark:bg-slate-700 rounded-lg shadow-xl p-6 border-l-4 ${
+    <div className={`bg-white dark:bg-gray-700 rounded-lg shadow-xl p-6 border-l-4 ${
       server.status?.is_up ? 'border-green-500' : 'border-red-500'
     } hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors`}>
       <div className="flex items-start justify-between mb-4">
@@ -114,7 +114,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
           <Server className="w-5 h-5 text-gray-500 dark:text-slate-400" />
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white">{server.name}</h3>
-            <p className="text-sm text-gray-600 dark:text-slate-400">{server.url}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-200">{server.url}</p>
           </div>
         </div>
         <div className="flex gap-1">
@@ -156,16 +156,16 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
 
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-600 dark:text-slate-400">Temps de réponse</span>
-          <span className="text-sm font-mono text-gray-900 dark:text-slate-300">
+          <span className="text-sm font-mono text-gray-900 dark:text-gray-200">
             {formatTime(server.status?.response_time_ms)}
           </span>
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600 dark:text-slate-400">Dernière vérification</span>
+          <span className="text-sm text-gray-600 dark:text-slate-200">Dernière vérification</span>
           <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-gray-500 dark:text-slate-500" />
-            <span className="text-sm text-gray-900 dark:text-slate-300">
+            <Clock className="w-3 h-3 text-gray-500 dark:text-slate-700" />
+            <span className="text-sm text-gray-900 dark:text-gray-200">
               {server.status?.last_check ? formatLastCheck(server.status.last_check) : 'N/A'}
             </span>
           </div>
@@ -177,7 +177,7 @@ const ServerCard = ({ server, onEdit, onDelete, onManualCheck, isHorizontal = fa
           </div>
         )}
 
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-slate-500">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-200">
           <span>Type: {server.type.toUpperCase()}</span>
           <span>Intervalle: {server.interval}</span>
         </div>
