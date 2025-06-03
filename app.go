@@ -162,6 +162,7 @@ func (a *App) AddServer(server Server) (Server, error) {
 }
 
 func (a *App) UpdateServer(server Server) (Server, error) {
+	fmt.Printf("UpdateServer reçu, interval = %q\n", server.Interval)
 	if server.ID == "" {
 		return server, fmt.Errorf("ID du serveur requis pour la mise à jour")
 	}
@@ -263,6 +264,7 @@ func (m *Monitor) StartMonitoring(server *Server) {
 		for {
 			select {
 			case <-ticker.C:
+				fmt.Printf("🔄 Tick pour %s à %s (interval=%v)\n", server.Name, time.Now().Format("15:04:05"), interval)
 				m.mutex.RLock()
 				serverCopy := *m.servers[server.ID]
 				m.mutex.RUnlock()
@@ -301,6 +303,8 @@ func (m *Monitor) StartMonitoring(server *Server) {
 				}
 
 			case <-stopChan:
+				fmt.Printf("⏹️ Arrêt monitoring pour %s\n", server.Name)
+
 				return
 			}
 		}
@@ -473,8 +477,9 @@ func parseDuration(s string) (time.Duration, error) {
 	if val, err := strconv.Atoi(strings.TrimSuffix(s, "s")); err == nil {
 		return time.Duration(val) * time.Second, nil
 	}
-
-	return time.ParseDuration(s)
+	duration, err := time.ParseDuration(s)
+	fmt.Println("Time duration ", duration)
+	return duration, err
 }
 
 /* func (a *App) SendTestNotification(title, message string) {
@@ -577,9 +582,6 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	if err := backend.SaveSettings(a.settings); err != nil {
 		return err
 	}
-
-	// 4. (Optionnel) Émettre un event vers le frontend pour informer que les settings ont changé
-	// runtime.EventsEmit(a.ctx, "SettingsChanged", s)
 
 	return nil
 }
