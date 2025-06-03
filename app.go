@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	notifications "monitoring_serv/backend"
 	"net"
 	"net/http"
 	"os"
@@ -22,9 +23,15 @@ type App struct {
 }
 
 // NewApp creates a new App application struct
-func NewApp() *App {
+func NewApp(notifier *notifications.NotificationManager) *App {
 	return &App{
-		monitor: NewMonitor(),
+		monitor: &Monitor{
+			servers:    make(map[string]*Server),
+			stopChans:  make(map[string]chan bool),
+			statusChan: make(chan ServerStatusUpdate, 100),
+			mutex:      sync.RWMutex{},
+			Notifier:   notifier,
+		},
 	}
 }
 
@@ -41,6 +48,14 @@ func (a *App) onDomReady(ctx context.Context) {
 	// Démarrer le monitoring pour tous les serveurs chargés
 	for _, server := range a.monitor.servers {
 		a.monitor.StartMonitoring(server)
+	}
+}
+
+func (a *App) onShutdown(ctx context.Context) {
+	fmt.Println(">>> onShutdown called, saving servers to file")
+	err := a.monitor.SaveServersToFile()
+	if err != nil {
+		fmt.Println(">>> Error saving servers:", err)
 	}
 }
 
@@ -66,6 +81,7 @@ type Monitor struct {
 	stopChans  map[string]chan bool
 	statusChan chan ServerStatusUpdate
 	mutex      sync.RWMutex
+	Notifier   *notifications.NotificationManager
 }
 
 type ServerStatusUpdate struct {
@@ -180,9 +196,8 @@ func (a *App) validateServer(server *Server) error {
 	return nil
 }
 
-// Méthodes de monitoring
+// Version améliorée de StartMonitoring avec gestion intelligente des notifications
 func (m *Monitor) StartMonitoring(server *Server) {
-	// Parse interval and timeout
 	interval, err := parseDuration(server.Interval)
 	if err != nil {
 		interval = 30 * time.Second
@@ -199,18 +214,65 @@ func (m *Monitor) StartMonitoring(server *Server) {
 	m.mutex.Unlock()
 
 	go func() {
-		// Première vérification immédiate
-		status := m.checkServer(server, timeout)
-		m.updateServerStatus(server.ID, status)
+		// État initial
+		prevStatus := server.Status
+		newStatus := m.CheckServer(server, timeout)
+		m.updateServerStatus(server.ID, newStatus)
+
+		// Notification pour le changement d'état initial
+		if prevStatus.IsUp != newStatus.IsUp {
+			statusLabel := "DOWN"
+			if newStatus.IsUp {
+				statusLabel = "UP"
+			}
+			m.Notifier.Send(server.Name, statusLabel)
+		}
 
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
+		consecutiveFailures := 0
+
 		for {
 			select {
 			case <-ticker.C:
-				status := m.checkServer(server, timeout)
-				m.updateServerStatus(server.ID, status)
+				m.mutex.RLock()
+				serverCopy := *m.servers[server.ID]
+				m.mutex.RUnlock()
+
+				prevStatus := serverCopy.Status
+				newStatus := m.CheckServer(&serverCopy, timeout)
+				m.updateServerStatus(server.ID, newStatus)
+
+				// Gestion intelligente des notifications
+				if prevStatus.IsUp != newStatus.IsUp {
+					if newStatus.IsUp {
+						// Serveur de nouveau UP
+						consecutiveFailures = 0
+						m.Notifier.Send(server.Name, "UP")
+					} else {
+						// Serveur DOWN
+						consecutiveFailures++
+
+						// Notification critique après 3 échecs consécutifs
+						if consecutiveFailures >= 3 {
+							m.Notifier.SendCritical(server.Name,
+								fmt.Sprintf("DOWN (échecs: %d)", consecutiveFailures))
+						} else {
+							m.Notifier.Send(server.Name, "DOWN")
+						}
+					}
+				} else if !newStatus.IsUp {
+					// Serveur toujours DOWN, incrémenter le compteur
+					consecutiveFailures++
+
+					// Notification critique périodique pour les pannes persistantes
+					if consecutiveFailures%5 == 0 { // Tous les 5 échecs
+						m.Notifier.SendCritical(server.Name,
+							fmt.Sprintf("TOUJOURS DOWN (échecs: %d)", consecutiveFailures))
+					}
+				}
+
 			case <-stopChan:
 				return
 			}
@@ -226,7 +288,7 @@ func (m *Monitor) updateServerStatus(serverID string, status ServerStatus) {
 	m.mutex.Unlock()
 }
 
-func (m *Monitor) checkServer(server *Server, timeout time.Duration) ServerStatus {
+func (m *Monitor) CheckServer(server *Server, timeout time.Duration) ServerStatus {
 	start := time.Now()
 
 	switch server.Type {
@@ -386,4 +448,71 @@ func parseDuration(s string) (time.Duration, error) {
 	}
 
 	return time.ParseDuration(s)
+}
+
+/* func (a *App) SendTestNotification(title, message string) {
+	a.monitor.Notifier.Send(title, message)
+} */
+
+// Nouvelle méthode pour votre struct App
+func (a *App) SetNotificationsEnabled(enabled bool) {
+	a.monitor.Notifier.SetEnabled(enabled)
+}
+
+func (a *App) GetNotificationsEnabled() bool {
+	return a.monitor.Notifier.IsEnabled()
+}
+
+func (a *App) SetNotificationCooldown(minutes int) {
+	a.monitor.Notifier.SetCooldown(minutes)
+}
+
+func (a *App) GetNotificationCooldown() int {
+	return a.monitor.Notifier.GetCooldown()
+}
+
+func (a *App) ClearNotificationCooldowns() {
+	a.monitor.Notifier.ClearCooldowns()
+}
+
+// Méthode pour envoyer un résumé des serveurs en panne
+func (a *App) SendDownServersSummary() {
+	a.monitor.mutex.RLock()
+	defer a.monitor.mutex.RUnlock()
+
+	var downServers []string
+	for _, server := range a.monitor.servers {
+		if !server.Status.IsUp {
+			downServers = append(downServers, server.Name)
+		}
+	}
+
+	if len(downServers) > 0 {
+		a.monitor.Notifier.SendSummary(downServers)
+	}
+}
+
+func (a *App) ManualCheck(server Server) ServerStatus {
+	timeout, err := parseDuration(server.Timeout)
+	if err != nil {
+		timeout = 10 * time.Second
+	}
+	status := a.monitor.CheckServer(&server, timeout)
+
+	return status
+}
+
+func (a *App) GetSystemTheme() string {
+	cmd := exec.Command("defaults", "read", "-g", "AppleInterfaceStyle")
+	output, err := cmd.Output()
+	if err != nil {
+		// If command fails, assume light theme (default)
+		return "light"
+	}
+
+	theme := strings.TrimSpace(string(output))
+	if theme == "Dark" {
+		return "dark"
+	}
+	return "light"
 }

@@ -6,6 +6,8 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "windowsicon": "build/icon.ico",
+  "macicon": "build/icon.icns",
   "author": {
     "name": "gwendoo",
     "email": "unknow@gmail.com"
