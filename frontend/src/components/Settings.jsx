@@ -1,4 +1,3 @@
-// File: components/Settings.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { Save, X, RefreshCw, RotateCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { GetSettings, SaveSettings } from '../../wailsjs/go/main/App';
