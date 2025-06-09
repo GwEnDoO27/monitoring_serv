@@ -1,4 +1,3 @@
-// File: components/ServerForm.jsx
 
 const ServerForm = ({ editingServer, newServer, setNewServer, onClose, onSubmit }) => {
   return (
@@ -76,7 +75,7 @@ const ServerForm = ({ editingServer, newServer, setNewServer, onClose, onSubmit 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Intervalle
+                    Interval
                   </label>
                   <select
                     value={newServer.interval}
@@ -87,6 +86,11 @@ const ServerForm = ({ editingServer, newServer, setNewServer, onClose, onSubmit 
                     <option value="30s">30 secondes</option>
                     <option value="60s">1 minute</option>
                     <option value="300s">5 minutes</option>
+                    <option value="1800s">30 minutes</option>
+                    <option value="3600s">1 heure</option>
+                    <option value="25200s">7 heures</option>
+                    <option value="43200s">12 heures</option>
+                    <option value="86400s">24 heures</option>
                   </select>
                 </div>
 

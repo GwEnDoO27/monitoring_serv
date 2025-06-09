@@ -1,7 +1,6 @@
-// File: components/ServerHeader.jsx
-import { Plus } from 'lucide-react';
+import { Plus, Cog } from 'lucide-react';
 
-const ServerHeader = ({ upServers, totalServers, onAddClick }) => {
+const ServerHeader = ({ upServers, totalServers, onAddClick,OpenSettings }) => {
   const testNotification = () => {
     window.go.notifications.NotificationManager.Send("Test", "ℹ️ Statut Serveur")
       .then(() => console.log("Test envoyé"))
@@ -31,6 +30,11 @@ const ServerHeader = ({ upServers, totalServers, onAddClick }) => {
         >
           <Plus className="w-4 h-4" />
           Tester
+        </button>
+        <button
+          onClick={OpenSettings}
+        >
+        <Cog className="w-4 h-4"/>
         </button>
       </div>
     </div>

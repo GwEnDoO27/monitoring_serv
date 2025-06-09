@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	notifications "monitoring_serv/backend"
+	backend "monitoring_serv/backend"
 	"net"
 	"net/http"
 	"os"
@@ -16,15 +16,39 @@ import (
 	"time"
 )
 
-// App struct
 type App struct {
-	ctx     context.Context
-	monitor *Monitor
+	ctx        context.Context
+	monitor    *Monitor
+	notifier   *backend.NotificationManager
+	settings   backend.Settings
+	settingsMu sync.RWMutex
 }
 
-// NewApp creates a new App application struct
-func NewApp(notifier *notifications.NotificationManager) *App {
-	return &App{
+// NewApp crée une nouvelle instance de App en se basant sur les settings chargés
+func NewApp(notifier *backend.NotificationManager) *App {
+	// Charger les settings (ou valeurs par défaut)
+	s, err := backend.LoadSettings()
+	if err != nil {
+		fmt.Println("⚠️ Impossible de charger les settings :", err)
+		s = backend.DefaultSettings()
+	}
+
+	// Configurer le NotificationManager selon settings
+	switch s.NotificationMode {
+	case "inapp":
+		notifier.SetEnabled(true)
+	case "email":
+		// On désactive les notifs in-app, à étendre plus tard pour SMTP si besoin
+		notifier.SetEnabled(false)
+	case "none":
+		notifier.SetEnabled(false)
+	default:
+		notifier.SetEnabled(true)
+	}
+	// Appliquer le cooldown
+	notifier.SetCooldown(s.NotificationCooldown)
+
+	app := &App{
 		monitor: &Monitor{
 			servers:    make(map[string]*Server),
 			stopChans:  make(map[string]chan bool),
@@ -32,7 +56,10 @@ func NewApp(notifier *notifications.NotificationManager) *App {
 			mutex:      sync.RWMutex{},
 			Notifier:   notifier,
 		},
+		notifier: notifier,
+		settings: s,
 	}
+	return app
 }
 
 // startup is called when the app starts. The context is saved
@@ -81,7 +108,7 @@ type Monitor struct {
 	stopChans  map[string]chan bool
 	statusChan chan ServerStatusUpdate
 	mutex      sync.RWMutex
-	Notifier   *notifications.NotificationManager
+	Notifier   *backend.NotificationManager
 }
 
 type ServerStatusUpdate struct {
@@ -135,6 +162,7 @@ func (a *App) AddServer(server Server) (Server, error) {
 }
 
 func (a *App) UpdateServer(server Server) (Server, error) {
+	fmt.Printf("UpdateServer reçu, interval = %q\n", server.Interval)
 	if server.ID == "" {
 		return server, fmt.Errorf("ID du serveur requis pour la mise à jour")
 	}
@@ -236,6 +264,7 @@ func (m *Monitor) StartMonitoring(server *Server) {
 		for {
 			select {
 			case <-ticker.C:
+				fmt.Printf("🔄 Tick pour %s à %s (interval=%v)\n", server.Name, time.Now().Format("15:04:05"), interval)
 				m.mutex.RLock()
 				serverCopy := *m.servers[server.ID]
 				m.mutex.RUnlock()
@@ -274,6 +303,8 @@ func (m *Monitor) StartMonitoring(server *Server) {
 				}
 
 			case <-stopChan:
+				fmt.Printf("⏹️ Arrêt monitoring pour %s\n", server.Name)
+
 				return
 			}
 		}
@@ -446,8 +477,9 @@ func parseDuration(s string) (time.Duration, error) {
 	if val, err := strconv.Atoi(strings.TrimSuffix(s, "s")); err == nil {
 		return time.Duration(val) * time.Second, nil
 	}
-
-	return time.ParseDuration(s)
+	duration, err := time.ParseDuration(s)
+	fmt.Println("Time duration ", duration)
+	return duration, err
 }
 
 /* func (a *App) SendTestNotification(title, message string) {
@@ -515,4 +547,41 @@ func (a *App) GetSystemTheme() string {
 		return "dark"
 	}
 	return "light"
+}
+
+// GetSettings renvoie la struct Settings actuellement chargée
+func (a *App) GetSettings() (backend.Settings, error) {
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
+	return a.settings, nil
+}
+
+// SaveSettings reçoit une struct Settings depuis le frontend et la persiste
+func (a *App) SaveSettings(s backend.Settings) error {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+
+	// 1. Mettre à jour le NotificationManager
+	switch s.NotificationMode {
+	case "inapp":
+		a.notifier.SetEnabled(true)
+	case "email":
+		a.notifier.SetEnabled(false)
+		// TODO : plus tard, gérer envoi d’email
+	case "none":
+		a.notifier.SetEnabled(false)
+	default:
+		a.notifier.SetEnabled(true)
+	}
+	a.notifier.SetCooldown(s.NotificationCooldown)
+
+	// 2. Mettre à jour la valeur en mémoire
+	a.settings = s
+
+	// 3. Écrire dans le fichier settings.json
+	if err := backend.SaveSettings(a.settings); err != nil {
+		return err
+	}
+
+	return nil
 }
