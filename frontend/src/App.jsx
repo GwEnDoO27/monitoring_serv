@@ -9,7 +9,6 @@ import {
   ManualCheck,
   UpdateServer,
   GetSettings,
-  SaveSettings
 } from '../wailsjs/go/main/App';
 import { useTheme } from './hooks/useTheme';
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	backend "monitoring_serv/backend"
 	"net"
 	"net/http"
@@ -14,6 +16,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/emersion/go-smtp"
+	//smtpbackend "github.com/emersion/go-smtp/backend"
+	"github.com/wneessen/go-mail"
 )
 
 type App struct {
@@ -22,6 +28,22 @@ type App struct {
 	notifier   *backend.NotificationManager
 	settings   backend.Settings
 	settingsMu sync.RWMutex
+	smtpServer *smtp.Server
+	smtpPort   int
+}
+
+type EmbeddedSMTP struct {
+	// Stockage temporaire des emails
+	emails     []EmailMessage
+	smtpConfig backend.SMTPConfig
+}
+
+type EmailMessage struct {
+	From    string
+	To      []string
+	Subject string
+	Body    string
+	Time    time.Time
 }
 
 // NewApp crée une nouvelle instance de App en se basant sur les settings chargés
@@ -68,6 +90,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	// Charger les serveurs existants au démarrage
 	a.monitor.LoadServersFromFile()
+	a.StartEmbeddedSMTP()
 }
 
 // onDomReady is called after front-end resources have been loaded
@@ -566,8 +589,7 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	case "inapp":
 		a.notifier.SetEnabled(true)
 	case "email":
-		a.notifier.SetEnabled(false)
-		// TODO : plus tard, gérer envoi d’email
+		a.notifier.SetEnabled(true)
 	case "none":
 		a.notifier.SetEnabled(false)
 	default:
@@ -581,6 +603,570 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	// 3. Écrire dans le fichier settings.json
 	if err := backend.SaveSettings(a.settings); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// Implémentation du backend SMTP
+func (b *EmbeddedSMTP) NewSession(c *smtp.Conn) (smtp.Session, error) {
+	return &SMTPSession{backend: b}, nil
+}
+
+type SMTPSession struct {
+	backend *EmbeddedSMTP
+	from    string
+	to      []string
+}
+
+func (s *SMTPSession) AuthPlain(username, password string) error {
+	// Pas d'auth nécessaire pour notre usage interne
+	return nil
+}
+
+func (s *SMTPSession) Mail(from string, opts *smtp.MailOptions) error {
+	s.from = from
+	return nil
+}
+
+func (s *SMTPSession) Rcpt(to string, opts *smtp.RcptOptions) error {
+	s.to = append(s.to, to)
+	return nil
+}
+
+func (s *SMTPSession) Data(r io.Reader) error {
+	// Lire le contenu de l'email
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	// Parser le contenu basique
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	var subject, body string
+	var inHeaders = true
+
+	for _, line := range lines {
+		if inHeaders {
+			if strings.HasPrefix(line, "Subject: ") {
+				subject = strings.TrimPrefix(line, "Subject: ")
+			}
+			if line == "" {
+				inHeaders = false
+			}
+		} else {
+			body += line + "\n"
+		}
+	}
+
+	// Stocker l'email (ici on pourrait l'envoyer vraiment)
+	email := EmailMessage{
+		From:    s.from,
+		To:      s.to,
+		Subject: subject,
+		Body:    strings.TrimSpace(body),
+		Time:    time.Now(),
+	}
+
+	s.backend.emails = append(s.backend.emails, email)
+
+	// ICI: Envoyer l'email vers la vraie destination
+	if s.backend.smtpConfig.Host != "" {
+		go s.forwardToRealEmail(email, s.backend.smtpConfig)
+	} else {
+		log.Printf("⚠️ Pas de configuration SMTP, email stocké localement uniquement")
+	}
+
+	return nil
+}
+
+func (s *SMTPSession) Reset()        {}
+func (s *SMTPSession) Logout() error { return nil }
+
+// Forwarding vers le vrai destinataire
+// Dans votre main.go, remplacez la fonction forwardToRealEmail par :
+func (s *SMTPSession) forwardToRealEmail(email EmailMessage, smtpConfig backend.SMTPConfig) {
+	if smtpConfig.Host == "" || smtpConfig.Username == "" {
+		log.Printf("❌ Configuration SMTP incomplète, email non envoyé")
+		return
+	}
+
+	log.Printf("📧 Envoi email via %s:%d vers %v", smtpConfig.Host, smtpConfig.Port, email.To)
+
+	// Nettoyer le mot de passe pour Gmail
+	cleanPassword := cleanAppPassword(smtpConfig.Password)
+
+	// Créer le client avec timeout plus long
+	c, err := mail.NewClient(smtpConfig.Host,
+		mail.WithPort(smtpConfig.Port),
+		mail.WithTimeout(30*time.Second),
+	)
+	if err != nil {
+		log.Printf("❌ Erreur création client SMTP: %s", err)
+		return
+	}
+
+	// Configuration de l'authentification
+	c.SetSMTPAuth(mail.SMTPAuthPlain)
+	c.SetUsername(smtpConfig.Username)
+	c.SetPassword(cleanPassword)
+
+	// Configuration TLS
+	if smtpConfig.TLS {
+		c.SetTLSPolicy(mail.TLSMandatory)
+	} else {
+		c.SetTLSPolicy(mail.NoTLS)
+	}
+
+	// Créer le message
+	m := mail.NewMsg()
+
+	// Utiliser l'adresse From configurée ou celle du username
+	fromAddr := smtpConfig.From
+	if fromAddr == "" {
+		fromAddr = smtpConfig.Username
+	}
+
+	if err := m.From(fromAddr); err != nil {
+		log.Printf("❌ Erreur adresse From: %s", err)
+		return
+	}
+
+	// Envoyer à tous les destinataires
+	for _, to := range email.To {
+		if err := m.To(to); err != nil {
+			log.Printf("❌ Erreur adresse To: %s", err)
+			continue
+		}
+	}
+
+	m.Subject(email.Subject)
+	m.SetBodyString(mail.TypeTextPlain, email.Body)
+
+	// Envoyer l'email
+	if err := c.DialAndSend(m); err != nil {
+		log.Printf("❌ Erreur envoi email: %s", err)
+		return
+	}
+
+	log.Printf("✅ Email envoyé avec succès vers %v", email.To)
+}
+
+func (a *App) StartEmbeddedSMTP() error {
+	// IMPORTANT: Récupérer la config SMTP actuelle
+	a.settingsMu.RLock()
+	currentSMTPConfig := a.settings.SMTPConfig
+	a.settingsMu.RUnlock()
+
+	backend := &EmbeddedSMTP{
+		smtpConfig: currentSMTPConfig, // Utiliser la vraie config
+	}
+
+	s := smtp.NewServer(backend)
+	s.Addr = ":0" // Port automatique
+	s.Domain = "localhost"
+	s.AllowInsecureAuth = true
+
+	// Trouver un port libre
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return fmt.Errorf("impossible de créer le serveur SMTP: %s", err)
+	}
+
+	a.smtpPort = listener.Addr().(*net.TCPAddr).Port
+	log.Printf("🚀 Serveur SMTP embarqué démarré sur le port %d", a.smtpPort)
+	log.Printf("📧 Configuration SMTP: %s:%d (TLS: %t)", currentSMTPConfig.Host, currentSMTPConfig.Port, currentSMTPConfig.TLS)
+
+	// Démarrer le serveur en arrière-plan
+	go func() {
+		if err := s.Serve(listener); err != nil {
+			log.Printf("❌ Erreur serveur SMTP: %s", err)
+		}
+	}()
+
+	a.smtpServer = s
+	return nil
+}
+
+// Redémarrer le serveur SMTP quand la config change
+func (a *App) RestartEmbeddedSMTP() error {
+	// Arrêter l'ancien serveur
+	if a.smtpServer != nil {
+		a.smtpServer.Close()
+		log.Printf("🛑 Ancien serveur SMTP arrêté")
+	}
+
+	// Redémarrer avec la nouvelle config
+	return a.StartEmbeddedSMTP()
+}
+
+func (a *App) SaveSetting(s backend.Settings) error {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+
+	// Vérifier si la config SMTP a changé
+	smtpChanged := false
+	if a.settings.SMTPConfig.Host != s.SMTPConfig.Host ||
+		a.settings.SMTPConfig.Port != s.SMTPConfig.Port ||
+		a.settings.SMTPConfig.Username != s.SMTPConfig.Username ||
+		a.settings.SMTPConfig.Password != s.SMTPConfig.Password ||
+		a.settings.SMTPConfig.TLS != s.SMTPConfig.TLS {
+		smtpChanged = true
+	}
+
+	// 1. Mettre à jour le NotificationManager
+	switch s.NotificationMode {
+	case "inapp":
+		a.notifier.SetEnabled(true)
+	case "email":
+		a.notifier.SetEnabled(true)
+	case "none":
+		a.notifier.SetEnabled(false)
+	default:
+		a.notifier.SetEnabled(true)
+	}
+	a.notifier.SetCooldown(s.NotificationCooldown)
+
+	// 2. Mettre à jour la valeur en mémoire
+	a.settings = s
+
+	// 3. Écrire dans le fichier settings.json
+	if err := backend.SaveSettings(a.settings); err != nil {
+		return err
+	}
+
+	// 4. Redémarrer le serveur SMTP si la config a changé
+	if smtpChanged && s.NotificationMode == "email" {
+		log.Printf("🔄 Configuration SMTP modifiée, redémarrage du serveur...")
+		go func() {
+			if err := a.RestartEmbeddedSMTP(); err != nil {
+				log.Printf("❌ Erreur redémarrage SMTP: %s", err)
+			}
+		}()
+	}
+
+	return nil
+}
+
+// Configuration de l'email utilisateur (ultra simple)
+func (a *App) SetUserEmail(email string) {
+	a.settings.UserEmail = email
+	log.Printf("📧 Email configuré: %s", email)
+}
+
+// Envoyer une alerte - maintenant 100% autonome
+func (a *App) SendServerAlert(serverName string) error {
+	if a.settings.UserEmail == "" {
+		return fmt.Errorf("email non configuré")
+	}
+
+	if a.smtpServer == nil {
+		fmt.Println("🚀 Démarrage du serveur SMTP embarqué... : ", a.smtpServer)
+		if err := a.StartEmbeddedSMTP(); err != nil {
+			return err
+		}
+	}
+
+	// Utiliser notre propre serveur SMTP embarqué
+	return a.sendViaEmbeddedSMTP(serverName)
+}
+
+func (a *App) sendViaEmbeddedSMTP(serverName string) error {
+	// Se connecter à notre propre serveur SMTP
+	c, err := mail.NewClient("localhost", mail.WithPort(a.smtpPort))
+	if err != nil {
+		return fmt.Errorf("connexion SMTP embarqué échouée: %s", err)
+	}
+
+	fmt.Println("Connexion au serveur SMTP embarqué sur le port :", a.smtpPort)
+	fmt.Println("Serveur : ", c)
+	// Pas d'auth nécessaire
+	c.SetTLSPolicy(mail.NoTLS)
+
+	// Créer le message
+	m := mail.NewMsg()
+	m.From("alert@monitoring-app.local")
+	m.To(a.settings.UserEmail)
+
+	subject := fmt.Sprintf("🚨 ALERTE: %s est DOWN", serverName)
+	m.Subject(subject)
+
+	body := fmt.Sprintf(`ALERTE SERVEUR
+
+	Serveur: %s
+	Statut: HORS LIGNE
+	Heure: %s
+
+	Votre serveur %s ne répond plus.
+
+	---
+	Envoyé par votre app de monitoring
+	(SMTP embarqué - Port %d)`,
+		serverName,
+		time.Now().Format("15:04:05 - 02/01/2006"),
+		serverName,
+		a.smtpPort)
+
+	m.SetBodyString(mail.TypeTextPlain, body)
+
+	// Envoyer via notre serveur embarqué
+	if err := c.DialAndSend(m); err != nil {
+		return fmt.Errorf("envoi via SMTP embarqué échoué: %s", err)
+	}
+
+	log.Println("✅ Alerte envoyée via SMTP embarqué a : ", a.settings.UserEmail)
+	return nil
+}
+
+// Fonction principale pour vos notifications
+func (a *App) NotifyServerDown(serverName string) {
+	// Notification in-app
+	log.Printf("📱 Notification: %s DOWN", serverName)
+
+	// Email automatique via SMTP embarqué
+	if a.settings.UserEmail != "" {
+		go func() {
+			err := a.SendServerAlert(serverName)
+			if err != nil {
+				log.Printf("❌ Erreur alerte email: %s", err)
+			}
+		}()
+	}
+}
+
+// Test de l'email
+func (a *App) TestEmailAlert() error {
+	fmt.Println("Envoi d'une alerte de test... a ", a.settings.UserEmail)
+	if a.settings.UserEmail == "" {
+		return fmt.Errorf("configurez votre email d'abord")
+	}
+	fmt.Println("Envoi d'une alerte de test ")
+	return a.SendServerAlert("TEST-SERVER")
+}
+
+// Obtenir le port SMTP (pour debug)
+func (a *App) GetSMTPPort() int {
+	fmt.Println("Port stmp :", a.smtpPort)
+	return a.smtpPort
+}
+
+// Arrêter proprement le serveur SMTP
+func (a *App) StopSMTP() {
+	if a.smtpServer != nil {
+		a.smtpServer.Close()
+		log.Printf("🛑 Serveur SMTP embarqué arrêté")
+	}
+}
+
+func (a *App) SetSMTPConfig(config backend.SMTPConfig) error {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+
+	a.settings.SMTPConfig = config
+
+	// Sauvegarder dans le fichier
+	return backend.SaveSettings(a.settings)
+}
+
+// Obtenir la configuration SMTP
+func (a *App) GetSMTPConfig() backend.SMTPConfig {
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
+	return a.settings.SMTPConfig
+}
+
+// Tester la configuration SMTP - Version simplifiée
+// Tester la configuration SMTP - VERSION AMÉLIORÉE
+func (a *App) TestSMTPConfig(config backend.SMTPConfig) error {
+	log.Printf("🧪 Test de la configuration SMTP: %s:%d", config.Host, config.Port)
+
+	// Validation basique
+	if config.Host == "" {
+		return fmt.Errorf("serveur SMTP requis")
+	}
+	if config.Username == "" {
+		return fmt.Errorf("nom d'utilisateur requis")
+	}
+	if config.Password == "" {
+		return fmt.Errorf("mot de passe requis")
+	}
+
+	// Nettoyer le mot de passe pour Gmail
+	cleanPassword := cleanAppPassword(config.Password)
+
+	// Créer le client avec timeout
+	c, err := mail.NewClient(config.Host,
+		mail.WithPort(config.Port),
+		mail.WithTimeout(15*time.Second),
+	)
+	if err != nil {
+		return fmt.Errorf("impossible de créer le client SMTP: %s", err)
+	}
+
+	// Configuration de l'authentification
+	c.SetSMTPAuth(mail.SMTPAuthPlain)
+	c.SetUsername(config.Username)
+	c.SetPassword(cleanPassword)
+
+	// Configuration TLS
+	if config.TLS {
+		c.SetTLSPolicy(mail.TLSMandatory)
+	} else {
+		c.SetTLSPolicy(mail.NoTLS)
+	}
+
+	// Test en envoyant un vrai email de test à l'utilisateur
+	return a.sendTestEmailWithConfig(config, config.Username, "🧪 Test de configuration SMTP")
+}
+
+// Envoyer un email de test
+func (a *App) SendTestEmail(to string) error {
+	config := a.GetSMTPConfig()
+	if config.Host == "" {
+		return fmt.Errorf("configuration SMTP non définie")
+	}
+
+	c, err := mail.NewClient(config.Host, mail.WithPort(config.Port))
+	if err != nil {
+		return err
+	}
+
+	c.SetSMTPAuth(mail.SMTPAuthPlain)
+	c.SetUsername(config.Username)
+	c.SetPassword(config.Password)
+
+	if config.TLS {
+		c.SetTLSPolicy(mail.TLSMandatory)
+	}
+
+	m := mail.NewMsg()
+
+	fromAddr := config.From
+	if fromAddr == "" {
+		fromAddr = config.Username
+	}
+
+	m.From(fromAddr)
+	m.To(to)
+	m.Subject("🧪 Test - Monitoring App")
+
+	body := fmt.Sprintf(`Test de configuration email
+
+Ceci est un email de test envoyé depuis votre application de monitoring.
+
+Configuration utilisée:
+- Serveur SMTP: %s:%d
+- Utilisateur: %s
+- TLS: %t
+
+Si vous recevez cet email, votre configuration est correcte !
+
+---
+Envoyé le %s`,
+		config.Host,
+		config.Port,
+		config.Username,
+		config.TLS,
+		time.Now().Format("15:04:05 - 02/01/2006"))
+
+	m.SetBodyString(mail.TypeTextPlain, body)
+
+	if err := c.DialAndSend(m); err != nil {
+		return fmt.Errorf("erreur lors de l'envoi: %s", err)
+	}
+
+	return nil
+}
+
+// Configurations pré-définies courantes (à ajouter comme méthodes utilitaires)
+func (a *App) GetGmailSMTPConfig() backend.SMTPConfig {
+	return backend.SMTPConfig{
+		Host: "smtp.gmail.com",
+		Port: 587,
+		TLS:  true,
+	}
+}
+
+func (a *App) GetOutlookSMTPConfig() backend.SMTPConfig {
+	return backend.SMTPConfig{
+		Host: "smtp-mail.outlook.com",
+		Port: 587,
+		TLS:  true,
+	}
+}
+
+func (a *App) GetYahooSMTPConfig() backend.SMTPConfig {
+	return backend.SMTPConfig{
+		Host: "smtp.mail.yahoo.com",
+		Port: 587,
+		TLS:  true,
+	}
+}
+
+// Fonction helper pour nettoyer le mot de passe d'application
+func cleanAppPassword(password string) string {
+	// Supprimer les espaces du mot de passe d'application Gmail
+	return strings.ReplaceAll(password, " ", "")
+}
+
+// Fonction helper pour envoyer un email avec une config spécifique
+func (a *App) sendTestEmailWithConfig(config backend.SMTPConfig, to, subject string) error {
+	c, err := mail.NewClient(config.Host, mail.WithPort(config.Port))
+	if err != nil {
+		return fmt.Errorf("impossible de créer le client SMTP: %s", err)
+	}
+
+	c.SetSMTPAuth(mail.SMTPAuthPlain)
+	c.SetUsername(config.Username)
+	c.SetPassword(config.Password)
+
+	if config.TLS {
+		c.SetTLSPolicy(mail.TLSMandatory)
+	} else {
+		c.SetTLSPolicy(mail.NoTLS)
+	}
+
+	m := mail.NewMsg()
+
+	fromAddr := config.From
+	if fromAddr == "" {
+		fromAddr = config.Username
+	}
+
+	if err := m.From(fromAddr); err != nil {
+		return fmt.Errorf("adresse From invalide: %s", err)
+	}
+
+	if err := m.To(to); err != nil {
+		return fmt.Errorf("adresse To invalide: %s", err)
+	}
+
+	m.Subject(subject)
+
+	body := fmt.Sprintf(`✅ Test de configuration SMTP réussi !
+
+Configuration utilisée:
+- Serveur: %s:%d
+- Utilisateur: %s
+- TLS: %t
+
+Votre configuration email est correcte et prête à être utilisée pour les alertes de monitoring.
+
+---
+Envoyé le %s`,
+		config.Host,
+		config.Port,
+		config.Username,
+		config.TLS,
+		time.Now().Format("15:04:05 - 02/01/2006"))
+
+	m.SetBodyString(mail.TypeTextPlain, body)
+
+	// Envoyer l'email (cela teste la connexion ET l'authentification)
+	if err := c.DialAndSend(m); err != nil {
+		return fmt.Errorf("échec du test SMTP: %s", err)
 	}
 
 	return nil

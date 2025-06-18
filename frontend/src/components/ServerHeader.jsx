@@ -1,11 +1,18 @@
-import { Plus, Cog } from 'lucide-react';
+import { CirclePlus, Cog, Plus } from 'lucide-react';
+import { TestEmailAlert } from '../../wailsjs/go/main/App';
 
-const ServerHeader = ({ upServers, totalServers, onAddClick,OpenSettings }) => {
+const ServerHeader = ({ upServers, totalServers, onAddClick, OpenSettings }) => {
   const testNotification = () => {
     window.go.notifications.NotificationManager.Send("Test", "ℹ️ Statut Serveur")
       .then(() => console.log("Test envoyé"))
       .catch(err => console.error("Erreur:", err));
   };
+
+  const testEmailAlert = async () => {
+    await TestEmailAlert("Test Email Alert", "Ceci est un test d'alerte par email");
+    console.log("Envoi de l'alerte par email...");
+
+  }
 
   return (
     <div className="mb-8">
@@ -32,9 +39,16 @@ const ServerHeader = ({ upServers, totalServers, onAddClick,OpenSettings }) => {
           Tester
         </button>
         <button
+          onClick={testEmailAlert}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow lg"
+        >
+          <CirclePlus className="w-4 h-4" />
+          Tester
+        </button>
+        <button
           onClick={OpenSettings}
         >
-        <Cog className="w-4 h-4"/>
+          <Cog className="w-4 h-4" />
         </button>
       </div>
     </div>

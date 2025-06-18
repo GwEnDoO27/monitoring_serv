@@ -7,10 +7,21 @@ import (
 
 // Settings contient toutes les préférences utilisateur que l’on persiste
 type Settings struct {
-	Theme                string `json:"theme"`                // "auto" | "light" | "dark"
-	NotificationMode     string `json:"notificationMode"`     // "inapp" | "email" | "none"
-	NotificationCooldown int    `json:"notificationCooldown"` // en minutes
-	RefreshInterval      int    `json:"refreshInterval"`      // en secondes
+	Theme                string     `json:"theme"`                // "auto" | "light" | "dark"
+	NotificationMode     string     `json:"notificationMode"`     // "inapp" | "email" | "none"
+	NotificationCooldown int        `json:"notificationCooldown"` // en minutes
+	RefreshInterval      int        `json:"refreshInterval"`      // en secondes
+	UserEmail            string     `json:"userEmail"`            // adresse email pour les notifications
+	SMTPConfig           SMTPConfig `json:"smtp_config"`
+}
+
+type SMTPConfig struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	From     string `json:"from"`
+	TLS      bool   `json:"tls"`
 }
 
 // defaultSettings renvoie une struct Settings avec les valeurs par défaut
@@ -19,6 +30,8 @@ func DefaultSettings() Settings {
 		Theme:                "auto",
 		NotificationMode:     "inapp",
 		NotificationCooldown: 10,
+		RefreshInterval:      60,
+		UserEmail:            "",
 	}
 }
 
