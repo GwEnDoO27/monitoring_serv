@@ -505,10 +505,6 @@ func parseDuration(s string) (time.Duration, error) {
 	return duration, err
 }
 
-/* func (a *App) SendTestNotification(title, message string) {
-	a.monitor.Notifier.Send(title, message)
-} */
-
 // Nouvelle méthode pour votre struct App
 func (a *App) SetNotificationsEnabled(enabled bool) {
 	a.monitor.Notifier.SetEnabled(enabled)
@@ -873,53 +869,6 @@ func (a *App) SendServerAlert(serverName string) error {
 	return a.sendViaEmbeddedSMTP(serverName)
 }
 
-func (a *App) sendViaEmbeddedSMTP(serverName string) error {
-	// Se connecter à notre propre serveur SMTP
-	c, err := mail.NewClient("localhost", mail.WithPort(a.smtpPort))
-	if err != nil {
-		return fmt.Errorf("connexion SMTP embarqué échouée: %s", err)
-	}
-
-	fmt.Println("Connexion au serveur SMTP embarqué sur le port :", a.smtpPort)
-	fmt.Println("Serveur : ", c)
-	// Pas d'auth nécessaire
-	c.SetTLSPolicy(mail.NoTLS)
-
-	// Créer le message
-	m := mail.NewMsg()
-	m.From("alert@monitoring-app.local")
-	m.To(a.settings.UserEmail)
-
-	subject := fmt.Sprintf("🚨 ALERTE: %s est DOWN", serverName)
-	m.Subject(subject)
-
-	body := fmt.Sprintf(`ALERTE SERVEUR
-
-	Serveur: %s
-	Statut: HORS LIGNE
-	Heure: %s
-
-	Votre serveur %s ne répond plus.
-
-	---
-	Envoyé par votre app de monitoring
-	(SMTP embarqué - Port %d)`,
-		serverName,
-		time.Now().Format("15:04:05 - 02/01/2006"),
-		serverName,
-		a.smtpPort)
-
-	m.SetBodyString(mail.TypeTextPlain, body)
-
-	// Envoyer via notre serveur embarqué
-	if err := c.DialAndSend(m); err != nil {
-		return fmt.Errorf("envoi via SMTP embarqué échoué: %s", err)
-	}
-
-	log.Println("✅ Alerte envoyée via SMTP embarqué a : ", a.settings.UserEmail)
-	return nil
-}
-
 // Fonction principale pour vos notifications
 func (a *App) NotifyServerDown(serverName string) {
 	// Notification in-app
@@ -977,7 +926,7 @@ func (a *App) GetSMTPConfig() backend.SMTPConfig {
 	return a.settings.SMTPConfig
 }
 
-// Tester la configuration SMTP - Version simplifiée
+/*
 // Tester la configuration SMTP - VERSION AMÉLIORÉE
 func (a *App) TestSMTPConfig(config backend.SMTPConfig) error {
 	log.Printf("🧪 Test de la configuration SMTP: %s:%d", config.Host, config.Port)
@@ -1019,7 +968,7 @@ func (a *App) TestSMTPConfig(config backend.SMTPConfig) error {
 
 	// Test en envoyant un vrai email de test à l'utilisateur
 	return a.sendTestEmailWithConfig(config, config.Username, "🧪 Test de configuration SMTP")
-}
+} */
 
 // Envoyer un email de test
 func (a *App) SendTestEmail(to string) error {
@@ -1111,16 +1060,23 @@ func cleanAppPassword(password string) string {
 	return strings.ReplaceAll(password, " ", "")
 }
 
-// Fonction helper pour envoyer un email avec une config spécifique
-func (a *App) sendTestEmailWithConfig(config backend.SMTPConfig, to, subject string) error {
-	c, err := mail.NewClient(config.Host, mail.WithPort(config.Port))
+// Version corrigée avec encodage proper
+/* func (a *App) sendTestEmailWithConfig(config backend.SMTPConfig, to, subject string) error {
+	cleanPassword := cleanAppPassword(config.Password)
+
+	log.Printf("📧 Création du client SMTP...")
+	c, err := mail.NewClient(config.Host,
+		mail.WithPort(config.Port),
+		mail.WithTimeout(30*time.Second),
+	)
 	if err != nil {
 		return fmt.Errorf("impossible de créer le client SMTP: %s", err)
 	}
 
+	log.Printf("🔐 Configuration de l'authentification...")
 	c.SetSMTPAuth(mail.SMTPAuthPlain)
 	c.SetUsername(config.Username)
-	c.SetPassword(config.Password)
+	c.SetPassword(cleanPassword)
 
 	if config.TLS {
 		c.SetTLSPolicy(mail.TLSMandatory)
@@ -1128,6 +1084,7 @@ func (a *App) sendTestEmailWithConfig(config backend.SMTPConfig, to, subject str
 		c.SetTLSPolicy(mail.NoTLS)
 	}
 
+	log.Printf("✉️ Création du message...")
 	m := mail.NewMsg()
 
 	fromAddr := config.From
@@ -1143,31 +1100,103 @@ func (a *App) sendTestEmailWithConfig(config backend.SMTPConfig, to, subject str
 		return fmt.Errorf("adresse To invalide: %s", err)
 	}
 
-	m.Subject(subject)
+	// Sujet simple sans emojis
+	m.Subject("Test de configuration SMTP - Monitoring App")
 
-	body := fmt.Sprintf(`✅ Test de configuration SMTP réussi !
+	// Corps d'email SANS emojis et caractères spéciaux
+	var bodyBuilder strings.Builder
+	bodyBuilder.WriteString("TEST DE CONFIGURATION SMTP REUSSI !\n\n")
+	bodyBuilder.WriteString("Configuration utilisee:\n")
+	bodyBuilder.WriteString(fmt.Sprintf("- Serveur: %s:%d\n", config.Host, config.Port))
+	bodyBuilder.WriteString(fmt.Sprintf("- Utilisateur: %s\n", config.Username))
+	bodyBuilder.WriteString(fmt.Sprintf("- TLS: %t\n", config.TLS))
+	bodyBuilder.WriteString(fmt.Sprintf("- Mot de passe: %d caracteres\n\n", len(cleanPassword)))
+	bodyBuilder.WriteString("Votre configuration email est correcte et prete a etre utilisee pour les alertes de monitoring.\n\n")
+	bodyBuilder.WriteString("---\n")
+	bodyBuilder.WriteString(fmt.Sprintf("Envoye le %s par Monitoring App\n", time.Now().Format("15:04:05 - 02/01/2006")))
 
-Configuration utilisée:
-- Serveur: %s:%d
-- Utilisateur: %s
-- TLS: %t
+	body := bodyBuilder.String()
 
-Votre configuration email est correcte et prête à être utilisée pour les alertes de monitoring.
+	// Configuration de l'encodage
+	m.SetEncoding(mail.EncodingQP) // Quoted-Printable
+	m.SetCharset(mail.CharsetUTF8) // UTF-8
 
----
-Envoyé le %s`,
-		config.Host,
-		config.Port,
-		config.Username,
-		config.TLS,
-		time.Now().Format("15:04:05 - 02/01/2006"))
-
+	// Définir explicitement le Content-Type
 	m.SetBodyString(mail.TypeTextPlain, body)
 
-	// Envoyer l'email (cela teste la connexion ET l'authentification)
+	// Debug
+	log.Printf("📝 Corps de l'email (%d caracteres):", len(body))
+	log.Printf("Apercu: %.50s...", body)
+
+	// Envoyer l'email
+	log.Printf("🚀 Tentative d'envoi...")
 	if err := c.DialAndSend(m); err != nil {
+		log.Printf("❌ Erreur détaillée: %s", err)
+
+		errorMsg := err.Error()
+		if strings.Contains(errorMsg, "535") && strings.Contains(errorMsg, "BadCredentials") {
+			return fmt.Errorf("identifiants Gmail incorrects - utilisez un mot de passe d'application de 16 caracteres")
+		}
+
+		if strings.Contains(errorMsg, "534") {
+			return fmt.Errorf("authentification requise - activez l'authentification a 2 facteurs sur Gmail")
+		}
+
+		if strings.Contains(errorMsg, "connection refused") {
+			return fmt.Errorf("impossible de se connecter a %s:%d", config.Host, config.Port)
+		}
+
 		return fmt.Errorf("échec du test SMTP: %s", err)
 	}
 
+	log.Printf("✅ Email envoyé avec succès à %s!", to)
+	return nil
+} */
+
+// Corps d'email pour les alertes SANS emojis
+func (a *App) createAlertEmailBody(serverName string) string {
+	var bodyBuilder strings.Builder
+
+	bodyBuilder.WriteString("ALERTE SERVEUR\n\n")
+	bodyBuilder.WriteString(fmt.Sprintf("Serveur: %s\n", serverName))
+	bodyBuilder.WriteString("Statut: HORS LIGNE\n")
+	bodyBuilder.WriteString(fmt.Sprintf("Heure: %s\n\n", time.Now().Format("15:04:05 - 02/01/2006")))
+	bodyBuilder.WriteString(fmt.Sprintf("Votre serveur %s ne repond plus.\n\n", serverName))
+	bodyBuilder.WriteString("---\n")
+	bodyBuilder.WriteString("Envoye par votre app de monitoring\n")
+
+	return bodyBuilder.String()
+}
+
+// Alertes via SMTP embarqué
+func (a *App) sendViaEmbeddedSMTP(serverName string) error {
+	c, err := mail.NewClient("localhost", mail.WithPort(a.smtpPort))
+	if err != nil {
+		return fmt.Errorf("connexion SMTP embarqué échouée: %s", err)
+	}
+
+	c.SetTLSPolicy(mail.NoTLS)
+
+	m := mail.NewMsg()
+	m.From("alert@monitoring-app.local")
+	m.To(a.settings.UserEmail)
+
+	// Sujet simple sans emojis
+	subject := fmt.Sprintf("ALERTE: %s est DOWN", serverName)
+	m.Subject(subject)
+
+	// Corps avec encodage correct
+	body := a.createAlertEmailBody(serverName)
+
+	// Configuration encodage
+	m.SetEncoding(mail.EncodingQP)
+	m.SetCharset(mail.CharsetUTF8)
+	m.SetBodyString(mail.TypeTextPlain, body)
+
+	if err := c.DialAndSend(m); err != nil {
+		return fmt.Errorf("envoi via SMTP embarqué échoué: %s", err)
+	}
+
+	log.Printf("✅ Alerte envoyée via SMTP embarqué à : %s", a.settings.UserEmail)
 	return nil
 }
