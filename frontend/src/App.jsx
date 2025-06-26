@@ -1,15 +1,14 @@
 // File: components/ServerMonitor.jsx
-import { Grid3X3, LayoutGrid, List } from 'lucide-react';
+import { Grid3X3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import {
   AddServer,
   DeleteServer,
   GetServers,
+  GetSettings,
   ManualCheck,
   UpdateServer,
-  GetSettings,
-  SaveSettings
 } from '../wailsjs/go/main/App';
 import { useTheme } from './hooks/useTheme';
 
@@ -34,11 +33,9 @@ const ServerMonitor = () => {
 
   const { theme, isLoading, isDark, setThemeManually } = useTheme();
 
-  // Ce useEffect ne dépend plus de [theme, isDark], mais seulement du premier montage
   useEffect(() => {
     loadServers();
 
-    // On récupère la préférence “theme” une seule fois au montage
     GetSettings()
       .then((s) => {
         if (['auto', 'light', 'dark'].includes(s.theme)) {
@@ -51,7 +48,7 @@ const ServerMonitor = () => {
 
     const interval = setInterval(loadServers, 5000);
     return () => clearInterval(interval);
-  }, []); // <-- tableau de dépendances vide
+  }, []);
 
   const loadServers = async () => {
     try {
@@ -123,7 +120,8 @@ const ServerMonitor = () => {
       console.error('Erreur pendant le test manuel :', err);
     }
   };
-    const handleSettingsClose = () => {
+
+  const handleSettingsClose = () => {
     setShowSettings(false);
     GetSettings()
       .then((s) => {
@@ -136,77 +134,57 @@ const ServerMonitor = () => {
       );
   };
 
-
-
   const upServers = servers.filter((s) => s.status?.is_up).length;
   const totalServers = servers.length;
 
-  // Affiche l’écran de chargement tant qu’on détecte le thème
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white">Chargement...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-gray-600 dark:text-gray-400">Chargement...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-nunito transition-colors duration-200">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-['SF_Pro_Display','system-ui','-apple-system','BlinkMacSystemFont','Segoe_UI','Roboto','sans-serif']">
+      {/* Barre de titre macOS style */}
+      <div className="h-11 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 flex items-center px-5 select-none">
+        <div className="flex-1 text-center">
+          <h1 className="text-sm font-medium text-gray-700 dark:text-gray-300">Server Monitor</h1>
+        </div>
+      </div>
+
+      <div className="p-5">
         <Toaster
           position="top-right"
           toastOptions={{
             style: {
-              background: 'var(--toast-bg)',
-              color: 'var(--toast-color)'
-            },
-            className: 'dark:bg-gray-800 dark:text-white bg-white text-gray-900'
+              background: isDark ? '#1f2937' : '#ffffff',
+              color: isDark ? '#f3f4f6' : '#111827',
+              borderRadius: '0.5rem',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              border: `1px solid ${isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(229, 231, 235, 0.5)'}`,
+              backdropFilter: 'blur(20px)',
+            }
           }}
         />
 
-        {/* Header avec boutons de basculement de vue */}
-        <div className="flex items-center justify-between mb-6">
-          <ServerHeader
-            upServers={upServers}
-            totalServers={totalServers}
-            onAddClick={() => setShowAddForm(true)}
-            OpenSettings={() => setShowSettings(true)}
-          />
+        {/* Header sur toute la largeur */}
+        <ServerHeader
+          upServers={upServers}
+          totalServers={totalServers}
+          onAddClick={() => setShowAddForm(true)}
+          OpenSettings={() => setShowSettings(true)}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
 
-          {/* Boutons de basculement de vue */}
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="text-sm font-medium">Grille</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              <span className="text-sm font-medium">Liste</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Conteneur des serveurs avec vue conditionnelle */}
+        {/* Conteneur des serveurs */}
         <div
-          className={`mb-8 ${
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-              : 'space-y-4'
-          }`}
+          className={`mb-8 ${viewMode === 'grid'
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+              : 'space-y-3'
+            }`}
         >
           {servers.map((server) => (
             <ServerCard
@@ -244,24 +222,22 @@ const ServerMonitor = () => {
         {/* Modal des réglages */}
         {showSettings && <Settings onClose={handleSettingsClose} />}
 
-
         {/* Message si aucun serveur */}
         {servers.length === 0 && (
-          <div className="text-center py-12">
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 max-w-md mx-auto">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Grid3X3 className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-center py-20">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl p-10 max-w-md w-full border border-gray-200/50 dark:border-gray-700/50 shadow-xl">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg">
+                <Grid3X3 className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-2">
                 Aucun serveur configuré
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Commencez par ajouter un serveur à monitorer pour voir son statut en
-                temps réel
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 leading-relaxed">
+                Commencez par ajouter un serveur à monitorer pour voir son statut en temps réel
               </p>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors shadow-lg font-medium"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-5 py-2.5 rounded-lg transition-all shadow-lg hover:shadow-xl font-medium text-sm"
               >
                 Ajouter votre premier serveur
               </button>

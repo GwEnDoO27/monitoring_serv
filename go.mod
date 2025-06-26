@@ -3,12 +3,15 @@ module monitoring_serv
 go 1.23
 
 require (
+	github.com/emersion/go-smtp v0.22.0
 	github.com/gen2brain/beeep v0.0.0-20240516210008-9c006672e7f4
 	github.com/wailsapp/wails/v2 v2.10.1
+	github.com/wneessen/go-mail v0.6.2
 )
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

@@ -9,9 +9,17 @@ export function ClearNotificationCooldowns():Promise<void>;
 
 export function DeleteServer(arg1:string):Promise<void>;
 
+export function GetGmailSMTPConfig():Promise<backend.SMTPConfig>;
+
 export function GetNotificationCooldown():Promise<number>;
 
 export function GetNotificationsEnabled():Promise<boolean>;
+
+export function GetOutlookSMTPConfig():Promise<backend.SMTPConfig>;
+
+export function GetSMTPConfig():Promise<backend.SMTPConfig>;
+
+export function GetSMTPPort():Promise<number>;
 
 export function GetServers():Promise<Array<main.Server>>;
 
@@ -19,14 +27,36 @@ export function GetSettings():Promise<backend.Settings>;
 
 export function GetSystemTheme():Promise<string>;
 
+export function GetYahooSMTPConfig():Promise<backend.SMTPConfig>;
+
 export function ManualCheck(arg1:main.Server):Promise<main.ServerStatus>;
+
+export function NotifyServerDown(arg1:string):Promise<void>;
+
+export function RestartEmbeddedSMTP():Promise<void>;
+
+export function SaveSetting(arg1:backend.Settings):Promise<void>;
 
 export function SaveSettings(arg1:backend.Settings):Promise<void>;
 
 export function SendDownServersSummary():Promise<void>;
 
+export function SendServerAlert(arg1:string):Promise<void>;
+
+export function SendTestEmail(arg1:string):Promise<void>;
+
 export function SetNotificationCooldown(arg1:number):Promise<void>;
 
 export function SetNotificationsEnabled(arg1:boolean):Promise<void>;
+
+export function SetSMTPConfig(arg1:backend.SMTPConfig):Promise<void>;
+
+export function SetUserEmail(arg1:string):Promise<void>;
+
+export function StartEmbeddedSMTP():Promise<void>;
+
+export function StopSMTP():Promise<void>;
+
+export function TestEmailAlert():Promise<void>;
 
 export function UpdateServer(arg1:main.Server):Promise<main.Server>;

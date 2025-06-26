@@ -14,12 +14,28 @@ export function DeleteServer(arg1) {
   return window['go']['main']['App']['DeleteServer'](arg1);
 }
 
+export function GetGmailSMTPConfig() {
+  return window['go']['main']['App']['GetGmailSMTPConfig']();
+}
+
 export function GetNotificationCooldown() {
   return window['go']['main']['App']['GetNotificationCooldown']();
 }
 
 export function GetNotificationsEnabled() {
   return window['go']['main']['App']['GetNotificationsEnabled']();
+}
+
+export function GetOutlookSMTPConfig() {
+  return window['go']['main']['App']['GetOutlookSMTPConfig']();
+}
+
+export function GetSMTPConfig() {
+  return window['go']['main']['App']['GetSMTPConfig']();
+}
+
+export function GetSMTPPort() {
+  return window['go']['main']['App']['GetSMTPPort']();
 }
 
 export function GetServers() {
@@ -34,8 +50,24 @@ export function GetSystemTheme() {
   return window['go']['main']['App']['GetSystemTheme']();
 }
 
+export function GetYahooSMTPConfig() {
+  return window['go']['main']['App']['GetYahooSMTPConfig']();
+}
+
 export function ManualCheck(arg1) {
   return window['go']['main']['App']['ManualCheck'](arg1);
+}
+
+export function NotifyServerDown(arg1) {
+  return window['go']['main']['App']['NotifyServerDown'](arg1);
+}
+
+export function RestartEmbeddedSMTP() {
+  return window['go']['main']['App']['RestartEmbeddedSMTP']();
+}
+
+export function SaveSetting(arg1) {
+  return window['go']['main']['App']['SaveSetting'](arg1);
 }
 
 export function SaveSettings(arg1) {
@@ -46,12 +78,40 @@ export function SendDownServersSummary() {
   return window['go']['main']['App']['SendDownServersSummary']();
 }
 
+export function SendServerAlert(arg1) {
+  return window['go']['main']['App']['SendServerAlert'](arg1);
+}
+
+export function SendTestEmail(arg1) {
+  return window['go']['main']['App']['SendTestEmail'](arg1);
+}
+
 export function SetNotificationCooldown(arg1) {
   return window['go']['main']['App']['SetNotificationCooldown'](arg1);
 }
 
 export function SetNotificationsEnabled(arg1) {
   return window['go']['main']['App']['SetNotificationsEnabled'](arg1);
+}
+
+export function SetSMTPConfig(arg1) {
+  return window['go']['main']['App']['SetSMTPConfig'](arg1);
+}
+
+export function SetUserEmail(arg1) {
+  return window['go']['main']['App']['SetUserEmail'](arg1);
+}
+
+export function StartEmbeddedSMTP() {
+  return window['go']['main']['App']['StartEmbeddedSMTP']();
+}
+
+export function StopSMTP() {
+  return window['go']['main']['App']['StopSMTP']();
+}
+
+export function TestEmailAlert() {
+  return window['go']['main']['App']['TestEmailAlert']();
 }
 
 export function UpdateServer(arg1) {

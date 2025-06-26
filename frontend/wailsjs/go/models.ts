@@ -1,10 +1,34 @@
 export namespace backend {
 	
+	export class SMTPConfig {
+	    host: string;
+	    port: number;
+	    username: string;
+	    password: string;
+	    from: string;
+	    tls: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SMTPConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.from = source["from"];
+	        this.tls = source["tls"];
+	    }
+	}
 	export class Settings {
 	    theme: string;
 	    notificationMode: string;
 	    notificationCooldown: number;
 	    refreshInterval: number;
+	    userEmail: string;
+	    smtp_config: SMTPConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -16,7 +40,27 @@ export namespace backend {
 	        this.notificationMode = source["notificationMode"];
 	        this.notificationCooldown = source["notificationCooldown"];
 	        this.refreshInterval = source["refreshInterval"];
+	        this.userEmail = source["userEmail"];
+	        this.smtp_config = this.convertValues(source["smtp_config"], SMTPConfig);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
