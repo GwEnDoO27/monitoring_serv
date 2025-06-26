@@ -59,6 +59,4 @@ export function StopSMTP():Promise<void>;
 
 export function TestEmailAlert():Promise<void>;
 
-export function TestSMTPConfig(arg1:backend.SMTPConfig):Promise<void>;
-
 export function UpdateServer(arg1:main.Server):Promise<main.Server>;

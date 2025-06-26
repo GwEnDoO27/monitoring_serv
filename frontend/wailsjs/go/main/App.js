@@ -114,10 +114,6 @@ export function TestEmailAlert() {
   return window['go']['main']['App']['TestEmailAlert']();
 }
 
-export function TestSMTPConfig(arg1) {
-  return window['go']['main']['App']['TestSMTPConfig'](arg1);
-}
-
 export function UpdateServer(arg1) {
   return window['go']['main']['App']['UpdateServer'](arg1);
 }
