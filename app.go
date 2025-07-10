@@ -1,3 +1,5 @@
+// Package main - Application de monitoring de serveurs
+// Cette application permet de surveiller plusieurs serveurs et d'envoyer des notifications par email
 package main
 
 import (
@@ -17,36 +19,41 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emersion/go-smtp"
+	"github.com/emersion/go-smtp"    // Serveur SMTP embarqué
 	//smtpbackend "github.com/emersion/go-smtp/backend"
-	"github.com/wneessen/go-mail"
+	"github.com/wneessen/go-mail"    // Client SMTP pour l'envoi d'emails
 )
 
+// App - Structure principale de l'application
 type App struct {
-	ctx        context.Context
-	monitor    *Monitor
-	notifier   *backend.NotificationManager
-	settings   backend.Settings
-	settingsMu sync.RWMutex
-	smtpServer *smtp.Server
-	smtpPort   int
+	ctx        context.Context                  // Contexte d'exécution de l'application
+	monitor    *Monitor                         // Gestionnaire de monitoring des serveurs
+	notifier   *backend.NotificationManager     // Gestionnaire de notifications avec cooldown
+	settings   backend.Settings                 // Configuration utilisateur
+	settingsMu sync.RWMutex                     // Mutex pour accès concurrent aux paramètres
+	smtpServer *smtp.Server                     // Serveur SMTP embarqué
+	smtpPort   int                              // Port du serveur SMTP embarqué
 }
 
+// EmbeddedSMTP - Gestionnaire du serveur SMTP embarqué
 type EmbeddedSMTP struct {
-	// Stockage temporaire des emails
-	emails     []EmailMessage
-	smtpConfig backend.SMTPConfig
+	// Stockage temporaire des emails reçus par le serveur embarqué
+	emails     []EmailMessage        // Liste des emails en attente de traitement
+	smtpConfig backend.SMTPConfig    // Configuration SMTP pour le transfert externe
 }
 
+// EmailMessage - Structure représentant un email
 type EmailMessage struct {
-	From    string
-	To      []string
-	Subject string
-	Body    string
-	Time    time.Time
+	From    string      // Adresse de l'expéditeur
+	To      []string    // Liste des destinataires
+	Subject string      // Sujet de l'email
+	Body    string      // Corps du message
+	Time    time.Time   // Horodatage de création
 }
 
-// NewApp crée une nouvelle instance de App en se basant sur les settings chargés
+// NewApp - Constructeur de l'application
+// Crée une nouvelle instance de App en se basant sur les settings chargés
+// Initialise le monitoring et la configuration SMTP
 func NewApp(notifier *backend.NotificationManager) *App {
 	// Charger les settings (ou valeurs par défaut)
 	s, err := backend.LoadSettings()
@@ -55,45 +62,51 @@ func NewApp(notifier *backend.NotificationManager) *App {
 		s = backend.DefaultSettings()
 	}
 
-	// Configurer le NotificationManager selon settings
+	// Configurer le NotificationManager selon le mode de notification choisi
 	switch s.NotificationMode {
 	case "inapp":
+		// Notifications dans l'application seulement
 		notifier.SetEnabled(true)
 	case "email":
-		// On désactive les notifs in-app, à étendre plus tard pour SMTP si besoin
+		// Notifications par email, désactiver les notifications in-app
 		notifier.SetEnabled(false)
 	case "none":
+		// Aucune notification
 		notifier.SetEnabled(false)
 	default:
+		// Par défaut, activer les notifications in-app
 		notifier.SetEnabled(true)
 	}
-	// Appliquer le cooldown
+	// Appliquer le délai de cooldown entre notifications
 	notifier.SetCooldown(s.NotificationCooldown)
 
+	// Créer l'instance de l'application avec ses composants
 	app := &App{
 		monitor: &Monitor{
-			servers:    make(map[string]*Server),
-			stopChans:  make(map[string]chan bool),
-			statusChan: make(chan ServerStatusUpdate, 100),
-			mutex:      sync.RWMutex{},
-			Notifier:   notifier,
+			servers:    make(map[string]*Server),    // Map des serveurs surveillés
+			stopChans:  make(map[string]chan bool), // Canaux d'arrêt par serveur
+			statusChan: make(chan ServerStatusUpdate, 100), // Canal des mises à jour de statut
+			mutex:      sync.RWMutex{},             // Mutex pour accès concurrent
+			Notifier:   notifier,                   // Gestionnaire de notifications
 		},
-		notifier: notifier,
-		settings: s,
+		notifier: notifier,  // Référence au gestionnaire de notifications
+		settings: s,         // Configuration utilisateur
 	}
 	return app
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
+// startup - Fonction appelée au démarrage de l'application
+// Le contexte est sauvegardé pour pouvoir appeler les méthodes runtime
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	// Charger les serveurs existants au démarrage
+	// Charger les serveurs existants depuis le fichier de configuration
 	a.monitor.LoadServersFromFile()
+	// Démarrer le serveur SMTP embarqué pour les notifications email
 	a.StartEmbeddedSMTP()
 }
 
-// onDomReady is called after front-end resources have been loaded
+// onDomReady - Fonction appelée après le chargement des ressources front-end
+// Démarre le monitoring de tous les serveurs
 func (a *App) onDomReady(ctx context.Context) {
 	// Démarrer le monitoring pour tous les serveurs chargés
 	for _, server := range a.monitor.servers {
@@ -101,6 +114,8 @@ func (a *App) onDomReady(ctx context.Context) {
 	}
 }
 
+// onShutdown - Fonction appelée à la fermeture de l'application
+// Sauvegarde les serveurs dans le fichier de configuration
 func (a *App) onShutdown(ctx context.Context) {
 	fmt.Println(">>> onShutdown called, saving servers to file")
 	err := a.monitor.SaveServersToFile()
@@ -109,88 +124,103 @@ func (a *App) onShutdown(ctx context.Context) {
 	}
 }
 
+// Server - Structure représentant un serveur à surveiller
 type Server struct {
-	ID       string       `json:"id"`
-	Name     string       `json:"name"`
-	URL      string       `json:"url"`
-	Type     string       `json:"type"`     // http, tcp, ping
-	Interval string       `json:"interval"` // Format string pour le frontend
-	Timeout  string       `json:"timeout"`  // Format string pour le frontend
-	Status   ServerStatus `json:"status"`
+	ID       string       `json:"id"`       // Identifiant unique du serveur
+	Name     string       `json:"name"`     // Nom convivial du serveur
+	URL      string       `json:"url"`      // URL ou adresse à surveiller
+	Type     string       `json:"type"`     // Type de monitoring: http, tcp, ping
+	Interval string       `json:"interval"` // Intervalle de vérification (format string)
+	Timeout  string       `json:"timeout"`  // Timeout pour les vérifications (format string)
+	Status   ServerStatus `json:"status"`   // Statut actuel du serveur
 }
 
+// ServerStatus - Structure représentant l'état d'un serveur
 type ServerStatus struct {
-	IsUp         bool      `json:"is_up"`
-	ResponseTime int64     `json:"response_time_ms"`
-	LastCheck    time.Time `json:"last_check"`
-	LastError    string    `json:"last_error,omitempty"`
+	IsUp         bool      `json:"is_up"`             // Serveur disponible ou non
+	ResponseTime int64     `json:"response_time_ms"`  // Temps de réponse en millisecondes
+	LastCheck    time.Time `json:"last_check"`        // Horodatage de la dernière vérification
+	LastError    string    `json:"last_error,omitempty"` // Dernière erreur rencontrée
 }
 
+// Monitor - Gestionnaire du monitoring des serveurs
 type Monitor struct {
-	servers    map[string]*Server
-	stopChans  map[string]chan bool
-	statusChan chan ServerStatusUpdate
-	mutex      sync.RWMutex
-	Notifier   *backend.NotificationManager
+	servers    map[string]*Server              // Map des serveurs surveillés par ID
+	stopChans  map[string]chan bool           // Canaux d'arrêt pour chaque serveur
+	statusChan chan ServerStatusUpdate       // Canal pour les mises à jour de statut
+	mutex      sync.RWMutex                  // Mutex pour accès concurrent sécurisé
+	Notifier   *backend.NotificationManager // Gestionnaire de notifications
 }
 
+// ServerStatusUpdate - Structure pour les mises à jour de statut
 type ServerStatusUpdate struct {
-	ServerID string
-	Status   ServerStatus
+	ServerID string  // Identifiant du serveur concerné
+	Status   ServerStatus  // Nouveau statut du serveur
 }
 
+// NewMonitor - Constructeur du gestionnaire de monitoring
+// Initialise toutes les structures de données nécessaires
 func NewMonitor() *Monitor {
 	return &Monitor{
-		servers:    make(map[string]*Server),
-		stopChans:  make(map[string]chan bool),
-		statusChan: make(chan ServerStatusUpdate, 100),
-		mutex:      sync.RWMutex{},
+		servers:    make(map[string]*Server),            // Map vide des serveurs
+		stopChans:  make(map[string]chan bool),         // Map vide des canaux d'arrêt
+		statusChan: make(chan ServerStatusUpdate, 100), // Canal avec buffer de 100
+		mutex:      sync.RWMutex{},                     // Mutex initialisé
 	}
 }
 
-// Méthodes exposées au frontend
+// ===== Méthodes exposées au frontend =====
+
+// GetServers - Récupère la liste de tous les serveurs
+// Retourne une copie sécurisée de la liste des serveurs
 func (a *App) GetServers() []Server {
-	a.monitor.mutex.RLock()
+	a.monitor.mutex.RLock()    // Verrouillage en lecture
 	defer a.monitor.mutex.RUnlock()
 
+	// Créer une slice avec la capacité appropriée
 	servers := make([]Server, 0, len(a.monitor.servers))
 	for _, server := range a.monitor.servers {
-		servers = append(servers, *server)
+		servers = append(servers, *server) // Copie des données
 	}
 	return servers
 }
 
+// AddServer - Ajoute un nouveau serveur à surveiller
+// Génère un ID unique, valide les données et démarre le monitoring
 func (a *App) AddServer(server Server) (Server, error) {
 	// Générer un ID unique si pas fourni
 	if server.ID == "" {
 		server.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 
-	// Valider les données
+	// Valider les données du serveur
 	if err := a.validateServer(&server); err != nil {
 		return server, err
 	}
 
+	// Ajouter le serveur de manière thread-safe
 	a.monitor.mutex.Lock()
 	a.monitor.servers[server.ID] = &server
 	a.monitor.mutex.Unlock()
 
-	// Sauvegarder dans le fichier
+	// Sauvegarder dans le fichier de configuration
 	a.monitor.SaveServersToFile()
 
-	// Démarrer le monitoring
+	// Démarrer le monitoring du nouveau serveur
 	a.monitor.StartMonitoring(&server)
 
 	return server, nil
 }
 
+// UpdateServer - Met à jour un serveur existant
+// Arrête l'ancien monitoring, met à jour les données et redémarre le monitoring
 func (a *App) UpdateServer(server Server) (Server, error) {
 	fmt.Printf("UpdateServer reçu, interval = %q\n", server.Interval)
 	if server.ID == "" {
 		return server, fmt.Errorf("ID du serveur requis pour la mise à jour")
 	}
 
-	// Valider les données
+	// Valider les nouvelles données
 	if err := a.validateServer(&server); err != nil {
 		return server, err
 	}
@@ -202,38 +232,42 @@ func (a *App) UpdateServer(server Server) (Server, error) {
 		delete(a.monitor.stopChans, server.ID)
 	}
 
-	// Mettre à jour le serveur
+	// Mettre à jour le serveur dans la map
 	a.monitor.servers[server.ID] = &server
 	a.monitor.mutex.Unlock()
 
-	// Sauvegarder dans le fichier
+	// Sauvegarder les modifications
 	a.monitor.SaveServersToFile()
 
-	// Redémarrer le monitoring
+	// Redémarrer le monitoring avec les nouveaux paramètres
 	a.monitor.StartMonitoring(&server)
 
 	return server, nil
 }
 
+// DeleteServer - Supprime un serveur de la surveillance
+// Arrête le monitoring et supprime toutes les données associées
 func (a *App) DeleteServer(id string) error {
 	a.monitor.mutex.Lock()
 	defer a.monitor.mutex.Unlock()
 
-	// Arrêter le monitoring
+	// Arrêter le monitoring du serveur
 	if stopChan, exists := a.monitor.stopChans[id]; exists {
 		close(stopChan)
 		delete(a.monitor.stopChans, id)
 	}
 
-	// Supprimer le serveur
+	// Supprimer le serveur de la map
 	delete(a.monitor.servers, id)
 
-	// Sauvegarder dans le fichier
+	// Sauvegarder les modifications
 	a.monitor.SaveServersToFile()
 
 	return nil
 }
 
+// validateServer - Valide les données d'un serveur
+// Vérifie que tous les champs requis sont présents et valides
 func (a *App) validateServer(server *Server) error {
 	if server.Name == "" {
 		return fmt.Errorf("nom du serveur requis")
@@ -241,31 +275,39 @@ func (a *App) validateServer(server *Server) error {
 	if server.URL == "" {
 		return fmt.Errorf("URL du serveur requise")
 	}
+	// Vérifier que le type de monitoring est supporté
 	if server.Type != "http" && server.Type != "tcp" && server.Type != "ping" {
 		return fmt.Errorf("type de serveur invalide")
 	}
 	return nil
 }
 
-// Version améliorée de StartMonitoring avec gestion intelligente des notifications
+// ===== Fonctions de monitoring =====
+
+// StartMonitoring - Démarre le monitoring d'un serveur
+// Version améliorée avec gestion intelligente des notifications
 func (m *Monitor) StartMonitoring(server *Server) {
+	// Parser l'intervalle de vérification ou utiliser la valeur par défaut
 	interval, err := parseDuration(server.Interval)
 	if err != nil {
 		interval = 30 * time.Second
 	}
 
+	// Parser le timeout ou utiliser la valeur par défaut
 	timeout, err := parseDuration(server.Timeout)
 	if err != nil {
 		timeout = 10 * time.Second
 	}
 
+	// Créer le canal d'arrêt pour ce serveur
 	stopChan := make(chan bool)
 	m.mutex.Lock()
 	m.stopChans[server.ID] = stopChan
 	m.mutex.Unlock()
 
+	// Lancer la goroutine de monitoring
 	go func() {
-		// État initial
+		// État initial du serveur
 		prevStatus := server.Status
 		newStatus := m.CheckServer(server, timeout)
 		m.updateServerStatus(server.ID, newStatus)
@@ -846,18 +888,24 @@ func (a *App) SaveSetting(s backend.Settings) error {
 	return nil
 }
 
-// Configuration de l'email utilisateur (ultra simple)
+// ===== Configuration des emails =====
+
+// SetUserEmail - Configure l'email de l'utilisateur
+// Email utilisé pour recevoir les notifications d'alerte
 func (a *App) SetUserEmail(email string) {
 	a.settings.UserEmail = email
 	log.Printf("📧 Email configuré: %s", email)
 }
 
-// Envoyer une alerte - maintenant 100% autonome
+// SendServerAlert - Envoie une alerte email pour un serveur down
+// Version 100% autonome utilisant le serveur SMTP embarqué
 func (a *App) SendServerAlert(serverName string) error {
+	// Vérifier que l'email est configuré
 	if a.settings.UserEmail == "" {
 		return fmt.Errorf("email non configuré")
 	}
 
+	// Démarrer le serveur SMTP embarqué si nécessaire
 	if a.smtpServer == nil {
 		fmt.Println("🚀 Démarrage du serveur SMTP embarqué... : ", a.smtpServer)
 		if err := a.StartEmbeddedSMTP(); err != nil {
@@ -869,12 +917,13 @@ func (a *App) SendServerAlert(serverName string) error {
 	return a.sendViaEmbeddedSMTP(serverName)
 }
 
-// Fonction principale pour vos notifications
+// NotifyServerDown - Fonction principale pour les notifications de serveur down
+// Gère les notifications in-app et email selon la configuration
 func (a *App) NotifyServerDown(serverName string) {
 	// Notification in-app
 	log.Printf("📱 Notification: %s DOWN", serverName)
 
-	// Email automatique via SMTP embarqué
+	// Email automatique via SMTP embarqué (asynchrone)
 	if a.settings.UserEmail != "" {
 		go func() {
 			err := a.SendServerAlert(serverName)
@@ -885,7 +934,8 @@ func (a *App) NotifyServerDown(serverName string) {
 	}
 }
 
-// Test de l'email
+// TestEmailAlert - Envoie un email de test
+// Utilise un serveur fictif pour tester la configuration email
 func (a *App) TestEmailAlert() error {
 	fmt.Println("Envoi d'une alerte de test... a ", a.settings.UserEmail)
 	if a.settings.UserEmail == "" {
@@ -895,13 +945,15 @@ func (a *App) TestEmailAlert() error {
 	return a.SendServerAlert("TEST-SERVER")
 }
 
-// Obtenir le port SMTP (pour debug)
+// GetSMTPPort - Obtient le port du serveur SMTP embarqué
+// Utilisé pour le debug et la configuration
 func (a *App) GetSMTPPort() int {
 	fmt.Println("Port stmp :", a.smtpPort)
 	return a.smtpPort
 }
 
-// Arrêter proprement le serveur SMTP
+// StopSMTP - Arrête proprement le serveur SMTP embarqué
+// Libère les ressources et ferme le serveur
 func (a *App) StopSMTP() {
 	if a.smtpServer != nil {
 		a.smtpServer.Close()
@@ -1153,46 +1205,58 @@ func cleanAppPassword(password string) string {
 	return nil
 } */
 
-// Corps d'email pour les alertes SANS emojis
+// ===== Génération du contenu des emails =====
+
+// createAlertEmailBody - Génère le corps d'un email d'alerte
+// Crée un message simple et clair sans caractères spéciaux
 func (a *App) createAlertEmailBody(serverName string) string {
 	var bodyBuilder strings.Builder
 
+	// En-tête de l'alerte
 	bodyBuilder.WriteString("ALERTE SERVEUR\n\n")
+	// Informations du serveur
 	bodyBuilder.WriteString(fmt.Sprintf("Serveur: %s\n", serverName))
 	bodyBuilder.WriteString("Statut: HORS LIGNE\n")
 	bodyBuilder.WriteString(fmt.Sprintf("Heure: %s\n\n", time.Now().Format("15:04:05 - 02/01/2006")))
+	// Message d'alerte
 	bodyBuilder.WriteString(fmt.Sprintf("Votre serveur %s ne repond plus.\n\n", serverName))
+	// Pied de page
 	bodyBuilder.WriteString("---\n")
 	bodyBuilder.WriteString("Envoye par votre app de monitoring\n")
 
 	return bodyBuilder.String()
 }
 
-// Alertes via SMTP embarqué
+// sendViaEmbeddedSMTP - Envoie un email via le serveur SMTP embarqué
+// Utilise le serveur SMTP local pour envoyer les alertes
 func (a *App) sendViaEmbeddedSMTP(serverName string) error {
+	// Créer le client SMTP vers le serveur embarqué
 	c, err := mail.NewClient("localhost", mail.WithPort(a.smtpPort))
 	if err != nil {
 		return fmt.Errorf("connexion SMTP embarqué échouée: %s", err)
 	}
 
+	// Pas de TLS pour le serveur embarqué local
 	c.SetTLSPolicy(mail.NoTLS)
 
+	// Créer le message
 	m := mail.NewMsg()
-	m.From("alert@monitoring-app.local")
-	m.To(a.settings.UserEmail)
+	m.From("alert@monitoring-app.local")  // Adresse expéditeur locale
+	m.To(a.settings.UserEmail)              // Adresse destinataire configurée
 
 	// Sujet simple sans emojis
 	subject := fmt.Sprintf("ALERTE: %s est DOWN", serverName)
 	m.Subject(subject)
 
-	// Corps avec encodage correct
+	// Générer le corps de l'email
 	body := a.createAlertEmailBody(serverName)
 
-	// Configuration encodage
-	m.SetEncoding(mail.EncodingQP)
-	m.SetCharset(mail.CharsetUTF8)
+	// Configuration de l'encodage pour les caractères spéciaux
+	m.SetEncoding(mail.EncodingQP)    // Quoted-Printable
+	m.SetCharset(mail.CharsetUTF8)    // UTF-8
 	m.SetBodyString(mail.TypeTextPlain, body)
 
+	// Envoyer l'email
 	if err := c.DialAndSend(m); err != nil {
 		return fmt.Errorf("envoi via SMTP embarqué échoué: %s", err)
 	}

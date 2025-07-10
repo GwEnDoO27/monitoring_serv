@@ -1,40 +1,53 @@
+// Composant Settings - Interface de configuration de l'application
+// Permet de configurer les thèmes, notifications, emails et SMTP
+
 import { AlertCircle, CheckCircle, Mail, RefreshCw, TestTube, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { GetGmailSMTPConfig, GetOutlookSMTPConfig, GetSettings, GetYahooSMTPConfig, SaveSettings } from '../../wailsjs/go/main/App';
+import { GetGmailSMTPConfig, GetOutlookSMTPConfig, GetSettings, GetYahooSMTPConfig, SaveSettings, SendTestEmail } from '../../wailsjs/go/main/App';
 
+/**
+ * Composant Settings - Interface de configuration de l'application
+ * @param {Function} onClose - Fonction appelée à la fermeture du modal
+ * @param {Function} onSettingsChanged - Fonction appelée quand les paramètres changent
+ */
 const Settings = ({ onClose, onSettingsChanged }) => {
-  // États locaux pour les paramètres
-  const [theme, setTheme] = useState('auto');
-  const [notificationMode, setNotificationMode] = useState('inapp');
-  const [notificationCooldown, setNotificationCooldown] = useState(10);
-  const [refreshInterval, setRefreshInterval] = useState(60);
-  const [userEmail, setUserEmail] = useState('');
+  // ===== États locaux pour les paramètres =====
+  const [theme, setTheme] = useState('auto');                    // Thème de l'interface
+  const [notificationMode, setNotificationMode] = useState('inapp'); // Mode de notification
+  const [notificationCooldown, setNotificationCooldown] = useState(10); // Délai entre notifications
+  const [refreshInterval, setRefreshInterval] = useState(60);    // Intervalle de rafraîchissement
+  const [userEmail, setUserEmail] = useState('');               // Email utilisateur
 
-  // États pour la configuration SMTP
+  // ===== États pour la configuration SMTP =====
   const [smtpConfig, setSmtpConfig] = useState({
-    host: '',
-    port: 587,
-    username: '',
-    password: '',
-    from: '',
-    tls: true
+    host: '',        // Serveur SMTP
+    port: 587,       // Port SMTP
+    username: '',    // Nom d'utilisateur
+    password: '',    // Mot de passe
+    from: '',        // Adresse expéditeur
+    tls: true        // Utiliser TLS
   });
 
-  // États pour l'interface utilisateur
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTestingSMTP, setIsTestingSMTP] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null);
-  const [smtpTestStatus, setSmtpTestStatus] = useState(null);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [initialSettings, setInitialSettings] = useState({});
+  // ===== États pour l'interface utilisateur =====
+  const [isLoading, setIsLoading] = useState(true);           // Chargement initial
+  const [isSaving, setIsSaving] = useState(false);            // Sauvegarde en cours
+  const [isTestingSMTP, setIsTestingSMTP] = useState(false);  // Test SMTP en cours
+  const [saveStatus, setSaveStatus] = useState(null);        // Statut de sauvegarde
+  const [smtpTestStatus, setSmtpTestStatus] = useState(null); // Statut du test SMTP
+  const [hasChanges, setHasChanges] = useState(false);       // Changements non sauvegardés
+  const [initialSettings, setInitialSettings] = useState({}); // Paramètres initiaux
 
-  // Charger les paramètres depuis Wails
+  // ===== Chargement des paramètres depuis le backend =====
   useEffect(() => {
+    /**
+     * Charge les paramètres depuis Wails et les valide
+     * Applique des valeurs par défaut si nécessaire
+     */
     const loadSettings = async () => {
       try {
         const settings = await GetSettings();
 
+        // Validation et application des valeurs par défaut
         const validatedSettings = {
           theme: ['auto', 'light', 'dark'].includes(settings.theme) ? settings.theme : 'auto',
           notificationMode: ['inapp', 'email', 'none'].includes(settings.notificationMode) ? settings.notificationMode : 'inapp',
@@ -70,8 +83,12 @@ const Settings = ({ onClose, onSettingsChanged }) => {
     loadSettings();
   }, []);
 
-  // Détecter les changements
+  // ===== Détection des changements =====
   useEffect(() => {
+    /**
+     * Compare les paramètres actuels avec les paramètres initiaux
+     * pour déterminer s'il y a des changements non sauvegardés
+     */
     const currentSettings = {
       theme,
       notificationMode,
@@ -81,11 +98,14 @@ const Settings = ({ onClose, onSettingsChanged }) => {
       smtpConfig,
     };
 
+    // Vérifier s'il y a des changements (comparaison spéciale pour smtpConfig)
     const changed = Object.keys(initialSettings).some(
       key => {
         if (key === 'smtpConfig') {
+          // Comparaison profonde pour l'objet SMTP
           return JSON.stringify(initialSettings[key]) !== JSON.stringify(currentSettings[key]);
         }
+        // Comparaison simple pour les autres propriétés
         return initialSettings[key] !== currentSettings[key];
       }
     );
@@ -93,7 +113,11 @@ const Settings = ({ onClose, onSettingsChanged }) => {
     setHasChanges(changed);
   }, [theme, notificationMode, notificationCooldown, refreshInterval, userEmail, smtpConfig, initialSettings]);
 
-  // Handlers
+  // ===== Gestionnaires d'événements =====
+  
+  /**
+   * Remet tous les paramètres aux valeurs par défaut
+   */
   const handleResetDefaults = useCallback(() => {
     setTheme('auto');
     setNotificationMode('inapp');
@@ -108,10 +132,15 @@ const Settings = ({ onClose, onSettingsChanged }) => {
       from: '',
       tls: true
     });
+    // Réinitialiser les statuts
     setSaveStatus(null);
     setSmtpTestStatus(null);
   }, []);
 
+  /**
+   * Sélectionne et configure un fournisseur SMTP prédéfini
+   * @param {string} provider - gmail, outlook, ou yahoo
+   */
   const handleProviderSelect = async (provider) => {
     let config;
     try {
@@ -135,7 +164,12 @@ const Settings = ({ onClose, onSettingsChanged }) => {
     }
   };
 
+  /**
+   * Teste la configuration SMTP en envoyant un email de test
+   * Vérifie que tous les champs requis sont remplis avant le test
+   */
   const handleTestSMTP = async () => {
+    // Vérifier que les champs requis sont remplis
     if (!smtpConfig.host || !smtpConfig.username || !smtpConfig.password) {
       setSmtpTestStatus('error');
       return;
@@ -145,7 +179,8 @@ const Settings = ({ onClose, onSettingsChanged }) => {
     setSmtpTestStatus(null);
 
     try {
-      await TestSMTPConfig(smtpConfig);
+      // Envoyer un email de test à l'adresse utilisateur
+      await SendTestEmail(userEmail);
       setSmtpTestStatus('success');
     } catch (error) {
       console.error('Erreur test SMTP:', error);
@@ -155,7 +190,11 @@ const Settings = ({ onClose, onSettingsChanged }) => {
     }
   };
 
+  /**
+   * Annule les changements et remet les paramètres initiaux
+   */
   const handleCancel = useCallback(() => {
+    // Restaurer tous les paramètres initiaux
     setTheme(initialSettings.theme || 'auto');
     setNotificationMode(initialSettings.notificationMode || 'inapp');
     setNotificationCooldown(initialSettings.notificationCooldown || 10);
@@ -169,15 +208,21 @@ const Settings = ({ onClose, onSettingsChanged }) => {
       from: '',
       tls: true
     });
+    // Réinitialiser les statuts
     setSaveStatus(null);
     setSmtpTestStatus(null);
   }, [initialSettings]);
 
+  /**
+   * Sauvegarde les paramètres modifiés
+   * Envoie les données au backend et met à jour l'interface
+   */
   const handleSaveSettings = useCallback(async () => {
     setIsSaving(true);
     setSaveStatus(null);
 
     try {
+      // Préparer les paramètres à sauvegarder
       const settingsToSave = {
         theme,
         notificationMode,
@@ -187,14 +232,18 @@ const Settings = ({ onClose, onSettingsChanged }) => {
         smtp_config: smtpConfig
       };
 
+      // Envoyer au backend
       await SaveSettings(settingsToSave);
+      // Mettre à jour les paramètres initiaux
       setInitialSettings({ ...settingsToSave, smtpConfig });
       setSaveStatus('success');
 
+      // Notifier le parent des changements
       if (onSettingsChanged) {
         onSettingsChanged(settingsToSave);
       }
 
+      // Fermer le modal après un délai
       setTimeout(() => {
         if (onClose) onClose();
       }, 1000);
