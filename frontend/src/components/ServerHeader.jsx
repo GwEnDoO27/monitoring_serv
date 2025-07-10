@@ -1,13 +1,33 @@
+// Composant ServerHeader - En-tête principal de l'application
+// Affiche les statistiques des serveurs et les contrôles principaux
+
 import { Cog, LayoutGrid, List, Plus } from 'lucide-react';
 import { TestEmailAlert } from '../../wailsjs/go/main/App';
 
+/**
+ * Composant d'en-tête principal de l'application
+ * @param {number} upServers - Nombre de serveurs en ligne
+ * @param {number} totalServers - Nombre total de serveurs
+ * @param {Function} onAddClick - Fonction pour ajouter un serveur
+ * @param {Function} OpenSettings - Fonction pour ouvrir les paramètres
+ * @param {string} viewMode - Mode d'affichage ('list' ou 'grid')
+ * @param {Function} onViewModeChange - Fonction pour changer le mode d'affichage
+ */
 const ServerHeader = ({ upServers, totalServers, onAddClick, OpenSettings, viewMode, onViewModeChange }) => {
+  /**
+   * Fonction de test pour les notifications desktop
+   * Envoie une notification de test via le système
+   */
   const testNotification = () => {
     window.go.notifications.NotificationManager.Send("Test", "ℹ️ Statut Serveur")
       .then(() => console.log("Test envoyé"))
       .catch(err => console.error("Erreur:", err));
   };
 
+  /**
+   * Fonction de test pour les alertes email
+   * Envoie un email de test via le backend
+   */
   const testEmailAlert = async () => {
     await TestEmailAlert("Test Email Alert", "Ceci est un test d'alerte par email");
     console.log("Envoi de l'alerte par email...");

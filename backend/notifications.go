@@ -1,3 +1,6 @@
+// Package backend - Gestion des notifications
+// Ce package gère l'envoi de notifications desktop avec gestion du cooldown
+// et différents types de notifications (normale, critique, résumé)
 package backend
 
 import (
@@ -5,32 +8,38 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gen2brain/beeep"
+	"github.com/gen2brain/beeep" // Bibliothèque pour notifications desktop
 )
 
+// NotificationManager - Gestionnaire de notifications avec cooldown
 // Stocke le dernier envoi de notification par serveur et par type
+// Empêche le spam de notifications en appliquant un délai minimum
 type NotificationManager struct {
 	LastSent map[string]map[string]time.Time // serveur -> type -> timestamp
-	Cooldown time.Duration
-	mutex    sync.RWMutex
-	enabled  bool
+	Cooldown time.Duration                   // Délai minimum entre notifications
+	mutex    sync.RWMutex                    // Mutex pour accès concurrent
+	enabled  bool                            // Notifications activées ou non
 }
 
+// NewNotificationManager - Constructeur du gestionnaire de notifications
+// Crée un nouveau gestionnaire avec le cooldown spécifié en minutes
 func NewNotificationManager(cooldownMinutes int) *NotificationManager {
 	return &NotificationManager{
-		LastSent: make(map[string]map[string]time.Time),
-		Cooldown: time.Duration(cooldownMinutes) * time.Minute,
-		mutex:    sync.RWMutex{},
-		enabled:  true,
+		LastSent: make(map[string]map[string]time.Time), // Map vide pour les timestamps
+		Cooldown: time.Duration(cooldownMinutes) * time.Minute, // Conversion en durée
+		mutex:    sync.RWMutex{},                       // Mutex initialisé
+		enabled:  true,                                 // Notifications activées par défaut
 	}
 }
 
-// ShouldNotify vérifie si on doit envoyer une notification
-// en tenant compte du type de notification (UP/DOWN)
+// ShouldNotify - Vérifie si une notification doit être envoyée
+// Prend en compte le type de notification (UP/DOWN) et le cooldown
+// Retourne true si la notification peut être envoyée
 func (n *NotificationManager) ShouldNotify(serverName, notificationType string) bool {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
+	// Ne pas notifier si les notifications sont désactivées
 	if !n.enabled {
 		return false
 	}
@@ -43,10 +52,12 @@ func (n *NotificationManager) ShouldNotify(serverName, notificationType string) 
 	// Vérifier le cooldown pour ce type de notification
 	last, exists := n.LastSent[serverName][notificationType]
 	if !exists || time.Since(last) > n.Cooldown {
+		// Mettre à jour le timestamp et autoriser la notification
 		n.LastSent[serverName][notificationType] = time.Now()
 		return true
 	}
 
+	// Cooldown pas encore écoulé
 	return false
 }
 

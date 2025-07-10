@@ -1,5 +1,16 @@
+// Composant ServerForm - Formulaire d'ajout/modification de serveur
+// Interface modale coulissante style macOS pour gérer les serveurs
+
 import { X } from 'lucide-react';
 
+/**
+ * Composant de formulaire pour créer ou modifier un serveur
+ * @param {Object} editingServer - Serveur en cours d'édition (null pour création)
+ * @param {Object} newServer - Données du nouveau serveur
+ * @param {Function} setNewServer - Fonction pour mettre à jour les données du serveur
+ * @param {Function} onClose - Fonction de fermeture du formulaire
+ * @param {Function} onSubmit - Fonction de soumission du formulaire
+ */
 const ServerForm = ({ editingServer, newServer, setNewServer, onClose, onSubmit }) => {
   return (
     <>

@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
@@ -38,7 +39,7 @@ func main() {
 	app := NewApp(notifier)
 	// Create application with options
 	err = wails.Run(&options.App{
-		Title:  "monitoring_serv",
+		Title:  "Monitoring serv",
 		Width:  1024,
 		Height: 768,
 		AssetServer: &assetserver.Options{
@@ -61,6 +62,28 @@ func main() {
 			Appearance:           mac.NSAppearanceNameAqua,
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
+			About: &mac.AboutInfo{
+				Title:   "Monitoring App",
+				Message: "© 2025 Me"},
+		},
+		Windows: &windows.Options{
+			WebviewIsTransparent:              false,
+			WindowIsTranslucent:               false,
+			BackdropType:                      windows.Mica,
+			DisablePinchZoom:                  false,
+			DisableWindowIcon:                 false,
+			DisableFramelessWindowDecorations: false,
+			WebviewUserDataPath:               "",
+			WebviewBrowserPath:                "",
+			Theme:                             windows.SystemDefault,
+			CustomTheme: &windows.ThemeSettings{
+				DarkModeTitleBar:   windows.RGB(20, 20, 20),
+				DarkModeTitleText:  windows.RGB(200, 200, 200),
+				DarkModeBorder:     windows.RGB(20, 0, 20),
+				LightModeTitleBar:  windows.RGB(200, 200, 200),
+				LightModeTitleText: windows.RGB(20, 20, 20),
+				LightModeBorder:    windows.RGB(200, 200, 200),
+			},
 		},
 	})
 

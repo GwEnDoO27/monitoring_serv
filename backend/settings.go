@@ -1,3 +1,6 @@
+// Package backend - Gestion des paramètres et configuration
+// Ce package contient les structures et fonctions pour gérer
+// les paramètres utilisateur et la configuration SMTP
 package backend
 
 import (
